@@ -1,5 +1,5 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
-import { getFirestore, collection, getDocs, doc, setDoc, deleteDoc } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+import { getFirestore, collection, getDocs, doc, setDoc, deleteDoc, getDoc } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 
 const firebaseConfig = {
   apiKey: "AIzaSyB8IfJRDxH6doI7FUz5HuxryXeL2WSem3Y",
@@ -63,4 +63,20 @@ window.saveInvoiceToDB = async function(invoice) {
         await setDoc(doc(db, "invoices", invoice.id), invoice);
         await setDoc(doc(db, "metadata", "invoice_seq"), { value: window.PH_DATA.nextInvoiceSeq });
     } catch(e) { console.error("Error saving invoice", e); }
+};
+
+window.saveSettingsToDB = async function(settings) {
+    try {
+        await setDoc(doc(db, "metadata", "app_settings"), settings);
+    } catch(e) { console.error("Error saving settings", e); }
+};
+
+window.loadSettingsFromDB = async function() {
+    try {
+        const snap = await getDoc(doc(db, "metadata", "app_settings"));
+        if (snap.exists()) {
+            return snap.data();
+        }
+    } catch(e) { console.error("Error loading settings", e); }
+    return null;
 };

@@ -946,6 +946,9 @@ window.autoSaveSettings = function() {
     }
     
     localStorage.setItem('padowa_invoice_settings', JSON.stringify(settings));
+    if (typeof window.saveSettingsToDB === 'function') {
+        window.saveSettingsToDB(settings);
+    }
     
     if (window.PH_DATA && window.PH_DATA.company) {
         window.PH_DATA.company.state = settings.state;
@@ -1017,11 +1020,18 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 });
 
-window.loadSettings = function() {
+window.loadSettings = async function() {
     try {
-        const savedSettings = localStorage.getItem('padowa_invoice_settings');
-        if (savedSettings) {
-            const settings = JSON.parse(savedSettings);
+        let settings = null;
+        if (typeof window.loadSettingsFromDB === 'function') {
+            settings = await window.loadSettingsFromDB();
+        }
+        if (!settings) {
+            const savedSettings = localStorage.getItem('padowa_invoice_settings');
+            if (savedSettings) settings = JSON.parse(savedSettings);
+        }
+        
+        if (settings) {
             const setCompName = document.getElementById('settingCompName');
             const setBranchName = document.getElementById('settingBranchName');
             const setCompPhone = document.getElementById('settingCompPhone');
