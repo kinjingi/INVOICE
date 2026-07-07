@@ -1,0 +1,354 @@
+/* ══════════════════════════════════════════════
+   PADOWA Healthcare – GST Tax Invoice Print Stylesheet
+   A4 Portrait Professional Layout - 29 Columns
+══════════════════════════════════════════════ */
+
+@media print {
+  * { 
+    -webkit-print-color-adjust: exact !important; 
+    print-color-adjust: exact !important; 
+  }
+  @page { 
+    size: A4 landscape; 
+    margin: 10mm 8mm; 
+  }
+}
+
+/* ── Base Document ── */
+.print-doc {
+  font-family: 'Inter', Arial, sans-serif;
+  font-size: 8pt;
+  color: #000;
+  line-height: 1.2;
+  background: white;
+  width: 100%;
+  position: relative;
+}
+
+/* Common Table borders */
+.print-border-table {
+  width: 100%;
+  border-collapse: collapse;
+  border: 1px solid #000;
+}
+.print-border-table th, .print-border-table td {
+  border: 1px solid #000;
+}
+
+/* ── Print Header ── */
+.print-header {
+  display: grid;
+  grid-template-columns: 35% 30% 35%;
+  border: 1px solid #000;
+  border-bottom: none;
+}
+
+/* Left Column - Company */
+.print-company-col {
+  padding: 4px;
+  border-right: 1px solid #000;
+}
+.print-company-logo-wrap {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 4px;
+}
+.print-logo-box {
+  width: 40px;
+  height: 40px;
+  border: 1px solid #000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 900;
+  font-size: 16px;
+}
+.print-company-name {
+  font-size: 14pt;
+  font-weight: 800;
+  text-transform: uppercase;
+  color: #000; /* or #0057D9 if they wanted optional blue, but usually black/white is better for invoices unless specified. User said "Mostly black & white Optional blue header (#0057D9)". Let's use blue for major headers to match prompt */
+  color: #0057D9;
+}
+.print-tagline {
+  font-size: 6.5pt;
+  font-weight: 600;
+}
+.print-co-details {
+  font-size: 7pt;
+  line-height: 1.3;
+}
+
+/* Center Column - Title */
+.print-title-col {
+  padding: 4px;
+  text-align: center;
+  border-right: 1px solid #000;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+}
+.print-title-text {
+  font-size: 16pt;
+  font-weight: 900;
+  text-decoration: underline;
+  margin-bottom: 6px;
+}
+.print-copy-type {
+  font-size: 10pt;
+  font-weight: 700;
+  border: 1px solid #000;
+  padding: 2px 8px;
+  border-radius: 12px;
+  margin-bottom: 4px;
+}
+.print-inv-type {
+  font-size: 9pt;
+  font-weight: 600;
+}
+
+/* Right Column - Invoice Info */
+.print-info-col {
+  padding: 0;
+}
+.print-info-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 7pt;
+}
+.print-info-table td {
+  border-bottom: 1px solid #000;
+  padding: 2px 4px;
+}
+.print-info-table tr:last-child td {
+  border-bottom: none;
+}
+.print-info-table td.lbl {
+  font-weight: 600;
+  border-right: 1px solid #000;
+  width: 40%;
+}
+.print-info-table td.val {
+  font-weight: 700;
+  font-family: 'Courier New', monospace;
+  font-size: 7.5pt;
+}
+
+/* ── Customer Details ── */
+.print-customer-details {
+  width: 100%;
+  border: 1px solid #000;
+  border-bottom: none;
+  display: grid;
+  grid-template-columns: 50% 50%;
+}
+.print-cust-col {
+  padding: 4px;
+}
+.print-cust-col:first-child {
+  border-right: 1px solid #000;
+}
+.print-cust-title {
+  background: #f0f0f0;
+  font-weight: 700;
+  font-size: 7.5pt;
+  padding: 2px;
+  border-bottom: 1px solid #000;
+  margin: -4px -4px 4px -4px;
+  text-align: center;
+  -webkit-print-color-adjust: exact;
+  print-color-adjust: exact;
+}
+
+.cust-grid-table {
+  width: 100%;
+  font-size: 7.5pt;
+}
+.cust-grid-table td {
+  padding: 1px 2px;
+  vertical-align: top;
+}
+.cust-grid-table td.lbl {
+  font-weight: 600;
+  width: 90px;
+}
+.cust-grid-table td.val {
+  font-weight: 700;
+}
+.cust-name-val {
+  font-size: 10pt;
+  font-weight: 800;
+}
+
+/* ── Product Table ── */
+.print-product-table {
+  font-size: 5.5pt; /* VERY tight to fit 29 columns */
+  line-height: 1.1;
+  text-align: center;
+}
+.print-product-table thead {
+  display: table-header-group; /* Repeats on every page */
+}
+.print-product-table th {
+  background: #0057D9;
+  color: #fff;
+  padding: 2px 1px;
+  font-weight: 700;
+  -webkit-print-color-adjust: exact;
+  print-color-adjust: exact;
+  border: 1px solid #000;
+  vertical-align: middle;
+}
+.print-product-table td {
+  padding: 2px 1px;
+  border-bottom: 1px dotted #000;
+  vertical-align: middle;
+}
+.print-product-table tbody tr:last-child td {
+  border-bottom: 1px solid #000;
+}
+
+/* Column Alignments & Specifics */
+.print-product-table .text-l { text-align: left; padding-left: 2px; }
+.print-product-table .text-r { text-align: right; padding-right: 2px; }
+.print-product-table .mono { font-family: 'Courier New', monospace; font-size: 5.5pt; }
+
+/* ── Post-Product Sections ── */
+.print-summary-wrap {
+  display: grid;
+  grid-template-columns: 60% 40%;
+  border: 1px solid #000;
+  border-top: none;
+}
+.print-summary-left {
+  border-right: 1px solid #000;
+  padding: 4px;
+  display: flex;
+  flex-direction: column;
+}
+.print-summary-right {
+  padding: 0;
+}
+
+/* Amount in Words & GST Summary Box */
+.print-amt-words {
+  font-size: 8pt;
+  font-weight: 700;
+  margin-bottom: 8px;
+  font-style: italic;
+}
+
+.gst-box-table {
+  width: 100%;
+  font-size: 6pt;
+  text-align: right;
+}
+.gst-box-table th {
+  background: #f0f0f0;
+  text-align: center;
+  font-weight: 700;
+  -webkit-print-color-adjust: exact;
+  print-color-adjust: exact;
+  padding: 2px;
+}
+.gst-box-table td {
+  padding: 2px;
+}
+.gst-box-table th:first-child, .gst-box-table td:first-child { text-align: center; }
+
+/* Invoice Summary Values */
+.inv-summary-table {
+  width: 100%;
+  font-size: 7.5pt;
+  border-collapse: collapse;
+}
+.inv-summary-table td {
+  padding: 2px 4px;
+  border-bottom: 1px solid #e0e0e0;
+}
+.inv-summary-table tr:last-child td { border-bottom: none; }
+.inv-summary-table td.lbl { font-weight: 600; }
+.inv-summary-table td.val { text-align: right; font-weight: 700; font-family: 'Courier New', monospace; }
+.inv-summary-table tr.grand-total-row td {
+  background: #0057D9;
+  color: white;
+  font-size: 10pt;
+  font-weight: 800;
+  -webkit-print-color-adjust: exact;
+  print-color-adjust: exact;
+  border-top: 1px solid #000;
+}
+
+/* ── Footer Elements ── */
+.print-footer-grid {
+  display: grid;
+  grid-template-columns: 35% 40% 25%;
+  border: 1px solid #000;
+  border-top: none;
+}
+
+.print-bank-details {
+  padding: 4px;
+  border-right: 1px solid #000;
+  font-size: 7pt;
+  position: relative;
+}
+.print-qr {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  width: 50px;
+  height: 50px;
+  border: 1px solid #000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 6pt;
+  text-align: center;
+}
+
+.print-terms {
+  padding: 4px;
+  border-right: 1px solid #000;
+  font-size: 6pt;
+}
+.print-terms ol {
+  margin: 0;
+  padding-left: 14px;
+}
+
+.print-signature-box {
+  padding: 4px;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  font-size: 7pt;
+}
+.sign-line {
+  margin-top: 30px;
+  border-top: 1px solid #000;
+  font-weight: 700;
+  padding-top: 2px;
+}
+.company-for {
+  font-weight: 800;
+  font-size: 8pt;
+}
+
+.print-barcode-box {
+  text-align: center;
+  padding: 2px;
+  font-family: 'Libre Barcode 39', 'Courier New', monospace;
+  font-size: 16pt;
+  letter-spacing: 2px;
+}
+
+.page-num {
+  text-align: right;
+  font-size: 6pt;
+  font-style: italic;
+  margin-top: 2px;
+}

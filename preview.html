@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Invoice Preview - PADOWA Healthcare</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800;900&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/icon?family=Material+Icons+Outlined" rel="stylesheet">
+  <link rel="stylesheet" href="css/preview.css?v=3">
+</head>
+<body>
+
+  <!-- Action Bar (Not visible in print) -->
+  <div class="action-bar">
+    <div class="action-bar-title" id="previewTitle">Invoice Preview</div>
+    <div class="action-buttons">
+      <button class="action-btn" onclick="window.close()"><span class="material-icons-outlined">arrow_back</span> Back</button>
+      <button class="action-btn"><span class="material-icons-outlined">edit</span> Edit</button>
+      <button class="action-btn primary" onclick="window.print()"><span class="material-icons-outlined">print</span> Print</button>
+      <button class="action-btn"><span class="material-icons-outlined">picture_as_pdf</span> Download PDF</button>
+      <button class="action-btn"><span class="material-icons-outlined">email</span> Email</button>
+      <button class="action-btn" id="btnWhatsAppShare" style="color:#16a34a; border-color:#16a34a;"><span class="material-icons-outlined">chat</span> WhatsApp</button>
+    </div>
+  </div>
+
+  <!-- HTML2PDF Library -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+
+  <div class="page-container">
+    <div class="a4-page">
+      <div class="invoice-box">
+        
+        <!-- TOP HEADER -->
+        <div class="header-row">
+          <!-- LEFT SECTION -->
+          <div class="header-col-left">
+            <h1 class="company-name" id="lblCompName">PADOWA HEALTHCARE</h1>
+            <div class="company-tagline" id="lblBranchName">Love in every dose</div>
+            <div class="company-details">
+              <span id="lblCompAddress">12/3, 4th Floor, Healthcare Tech Park,<br>
+              Outer Ring Road, Bellandur,<br>
+              Bengaluru, Karnataka 560103</span><br>
+              <strong>Phone:</strong> <span id="lblCompPhone">+91 80 4123 5678</span><br>
+              <strong>Email:</strong> <span id="lblCompEmail">billing@padowahealthcare.com</span><br>
+              <strong>Website:</strong> www.padowahealthcare.com<br><br>
+              <strong>GSTIN:</strong> <span id="lblCompGSTIN">29AABCP1234A1Z5</span><br>
+              <strong>DL No:</strong> <span id="lblCompDL">KA-B20-123456 / KA-B21-123457</span><br>
+              <strong>State:</strong> Karnataka (29)
+            </div>
+          </div>
+          
+          <!-- CENTER SECTION -->
+          <div class="header-col-center">
+            <div class="invoice-title">GST TAX INVOICE</div>
+            <div class="invoice-copy" id="invoiceCopyLabel">ORIGINAL FOR BUYER</div>
+          </div>
+          
+          <!-- RIGHT SECTION -->
+          <div class="header-col-right">
+            <div class="meta-grid">
+              <span class="meta-label">Invoice No:</span> <span id="lblInvNo" class="bold">PH260700009</span>
+              <span class="meta-label">Date:</span> <span id="lblInvDate">06/07/2026</span>
+              <span class="meta-label">Due Date:</span> <span id="lblInvDueDate">N/A</span>
+              <span class="meta-label">Time:</span> <span id="lblInvTime">14:30</span>
+              <span class="meta-label">FY:</span> <span>2026-27</span>
+              <span class="meta-label">Order No:</span> <span id="lblOrderNo">PO-9912</span>
+              <span class="meta-label">E-Way Bill No:</span> <span id="lblEwayBill" class="bold" style="font-size:11px;">N/A</span>
+              <span class="meta-label">Transport:</span> <span id="lblTransport">VRL Logistics</span>
+              <span class="meta-label">LR No:</span> <span id="lblLRNo">LR-88231</span>
+              <span class="meta-label">Vehicle No:</span> <span id="lblVehicle">KA 01 AB 1234</span>
+              <span class="meta-label">Payment:</span> <span id="lblPaymentMode" class="bold">Credit</span>
+              <span class="meta-label">Executive:</span> <span id="lblExec">Rajesh Kumar</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- CUSTOMER DETAILS -->
+        <div class="customer-row">
+          <div class="customer-col">
+            <div class="customer-title">BILL TO</div>
+            <div class="customer-name" id="lblBillName">Customer Name</div>
+            <div class="customer-details">
+              <span id="lblBillAddress">Address line 1<br>City, State PIN</span><br>
+              <strong>Phone:</strong> <span id="lblBillPhone">9876543210</span><br>
+              <strong>GSTIN:</strong> <span id="lblBillGST" class="bold">29XXXXX0000X1Z5</span><br>
+              <strong>DL No:</strong> <span id="lblBillDL">DL-001</span><br>
+              <strong>FSSAI No:</strong> <span id="lblBillFSSAI">N/A</span><br>
+              <strong>Payment Type:</strong> <span id="lblBillType" class="bold">CREDIT</span>
+            </div>
+          </div>
+          <div class="customer-col">
+            <div class="customer-title">SHIP TO (Place of Supply)</div>
+            <div class="customer-name" id="lblShipName">Customer Name</div>
+            <div class="customer-details">
+              <span id="lblShipAddress">Address line 1<br>City, State PIN</span><br>
+              <strong>State:</strong> <span id="lblPlaceOfSupply">Karnataka (29)</span><br>
+              <strong>Credit Days:</strong> <span id="lblCreditDays">30 Days</span><br>
+              <strong>Outstanding:</strong> <span id="lblOutstanding">Rs. 0.00</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- PRODUCT BILLING TABLE -->
+        <table class="product-table">
+          <thead>
+            <tr>
+              <th width="3%">S.No</th>
+              <th width="5%">Code</th>
+              <th width="15%" style="text-align:left;">Product Name & Composition</th>
+              <th width="5%">Pack</th>
+              <th width="6%">Batch</th>
+              <th width="5%">MFG</th>
+              <th width="5%">EXP</th>
+              <th width="6%">HSN</th>
+              <th width="4%">Qty</th>
+              <th width="4%">Free</th>
+              <th width="5%">MRP</th>
+              <th width="5%">PTR</th>
+              <th width="5%">PTS</th>
+              <th width="4%">Dis%</th>
+              <th width="6%">Taxable</th>
+              <th width="4%">GST%</th>
+              <th width="8%">Net Amt</th>
+            </tr>
+          </thead>
+          <tbody id="productTbody">
+            <!-- Dynamically populated -->
+          </tbody>
+        </table>
+
+        <!-- BOTTOM AREA (Footer Row) -->
+        <div class="footer-row">
+          
+          <!-- LEFT COLUMN (GST, Amount in words, Bank, Terms) -->
+          <div class="footer-left">
+            
+            <!-- GST Summary -->
+            <table class="gst-summary-table">
+              <thead>
+                <tr>
+                  <th>GST %</th>
+                  <th>Taxable Value</th>
+                  <th>CGST</th>
+                  <th>SGST</th>
+                  <th>IGST</th>
+                  <th>Total GST</th>
+                </tr>
+              </thead>
+              <tbody id="gstSummaryTbody">
+                <!-- Dynamically populated -->
+              </tbody>
+            </table>
+
+            <!-- Amount in Words -->
+            <div class="amount-words-box">
+              <span class="bold">Amount Chargeable (in words): </span>
+              <span id="lblAmountWords">Rupees Zero Only</span>
+            </div>
+
+            <!-- Bank & Terms -->
+            <div class="bank-terms-box">
+              <div class="bank-details">
+                <div class="box-title">Company Bank Details</div>
+                Bank Name: <strong id="lblBankName">HDFC Bank</strong><br>
+                A/c No: <strong id="lblBankAcc">50200012345678</strong><br>
+                IFSC Code: <strong id="lblBankIFSC">HDFC0001234</strong><br>
+                UPI ID: <strong id="lblBankUPI">padowahealthcare@hdfcbank</strong>
+              </div>
+              <div class="terms-details">
+                <div class="box-title">Terms & Conditions</div>
+                <div id="lblTerms" style="white-space: pre-wrap;">1. Goods once sold will not be taken back.
+2. Verify goods immediately after delivery.
+3. Interest @24% p.a. applicable on overdue payment.
+4. Subject to Bengaluru jurisdiction. E & O.E</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- RIGHT COLUMN (Bill Summary Box) -->
+          <div class="footer-right">
+            <div class="bill-summary">
+              <div class="summary-line"><span>Total Products</span> <span id="sumItems">0</span></div>
+              <div class="summary-line"><span>Total Qty (Sale+Free)</span> <span id="sumQty">0</span></div>
+              <div class="summary-line"><span>Total MRP Value</span> <span id="sumMRP">0.00</span></div>
+              <div class="summary-line"><span>Total PTS Value</span> <span id="sumPTS">0.00</span></div>
+              <div class="summary-line bold"><span>Gross Amount</span> <span id="sumGross">0.00</span></div>
+              <div class="summary-line"><span>(-) Discount</span> <span id="sumDisc">0.00</span></div>
+              <div class="summary-line bold"><span>Taxable Amount</span> <span id="sumTaxable">0.00</span></div>
+              <div class="summary-line"><span>(+) CGST</span> <span id="sumCGST">0.00</span></div>
+              <div class="summary-line"><span>(+) SGST</span> <span id="sumSGST">0.00</span></div>
+              <div class="summary-line"><span>(+) IGST</span> <span id="sumIGST">0.00</span></div>
+              <div class="summary-line"><span>Round Off</span> <span id="sumRoundOff">0.00</span></div>
+              <div class="grand-total-line"><span>GRAND TOTAL</span> <span id="sumGrand">₹ 0.00</span></div>
+            </div>
+          </div>
+
+        </div>
+
+        <!-- SIGNATURE AREA -->
+        <div class="signature-area">
+          <div class="sig-box">
+            <div class="sig-line">Receiver's Signature</div>
+          </div>
+          <div class="sig-box">
+            <div class="sig-line">Prepared By</div>
+          </div>
+          <div class="sig-box">
+            <div class="sig-line">Checked By</div>
+          </div>
+        </div>
+        
+        <div class="auth-sig">
+          <span class="bold" style="font-size:11px;">For PADOWA HEALTHCARE</span><br><br><br><br>
+          <span style="font-size:10px;">Authorized Signatory</span>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+  <script src="js/preview.js?v=3"></script>
+</body>
+</html>
