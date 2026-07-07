@@ -32,9 +32,24 @@ window.initFirebaseDB = async function() {
             window.PH_DATA.nextInvoiceSeq = seqDoc.data().value || 1;
         }
 
+        // Load settings from Firebase and apply them
+        const settingsDoc = seqSnap.docs.find(d => d.id === 'app_settings');
+        if (settingsDoc) {
+            window._firebaseSettings = settingsDoc.data();
+        }
+
         console.log("Firebase data loaded successfully");
     } catch(e) {
         console.error("Firebase init failed:", e);
+    }
+
+    // Now load settings (Firebase ones take priority over localStorage)
+    if (typeof window.loadSettings === 'function') {
+        await window.loadSettings();
+    }
+    // Ensure auth check runs after settings are applied
+    if (typeof window.checkAuth === 'function') {
+        window.checkAuth();
     }
 };
 

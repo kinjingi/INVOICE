@@ -834,10 +834,15 @@ document.addEventListener('keydown', (e) => {
 
 // ── DOMContentLoaded ──────────────────────────
 document.addEventListener('DOMContentLoaded', async () => {
-  if (typeof window.initFirebaseDB !== 'function') {
-      await new Promise(r => setTimeout(r, 50));
+  // Wait for Firebase module to fully load (it's a type="module" so loads after regular scripts)
+  let waited = 0;
+  while (typeof window.initFirebaseDB !== 'function' && waited < 5000) {
+      await new Promise(r => setTimeout(r, 100));
+      waited += 100;
   }
-  await window.initFirebaseDB();
+  if (typeof window.initFirebaseDB === 'function') {
+      await window.initFirebaseDB();
+  }
 
   App.init();
 
@@ -1023,7 +1028,10 @@ document.addEventListener('DOMContentLoaded', () => {
 window.loadSettings = async function() {
     try {
         let settings = null;
-        if (typeof window.loadSettingsFromDB === 'function') {
+        // Use pre-fetched settings from Firebase (loaded in initFirebaseDB)
+        if (window._firebaseSettings) {
+            settings = window._firebaseSettings;
+        } else if (typeof window.loadSettingsFromDB === 'function') {
             settings = await window.loadSettingsFromDB();
         }
         if (!settings) {
@@ -1115,11 +1123,7 @@ window.loadSettings = async function() {
     } catch(e) {}
 };
 
-// Call loadSettings on init
-document.addEventListener('DOMContentLoaded', () => {
-  checkAuth();
-  window.loadSettings();
-});
+// loadSettings is called from initFirebaseDB after Firebase loads
 
 window.autoIncrementInvoiceNumber = function() {
     // Use same counter as data.js (padowa_next_invoice_seq) to avoid sequence gaps
