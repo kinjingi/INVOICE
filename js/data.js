@@ -26,7 +26,7 @@ const PH_DATA = {
 
   // ── Sales Executives ─────────────────────────
   executives: [
-    { id: 'MR001', name: 'Rajesh Kumar',   region: 'Bengaluru North' },
+    { id: 'MR001', name: 'Dr. PRASANTH KINJINGI',   region: 'Bengaluru North' },
     { id: 'MR002', name: 'Priya Sharma',   region: 'Bengaluru South' },
     { id: 'MR003', name: 'Suresh Nair',    region: 'Mysuru / Hubballi' },
     { id: 'MR004', name: 'Anita Rao',      region: 'Chennai Tamil Nadu' },

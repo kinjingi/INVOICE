@@ -460,7 +460,7 @@ function mockFetchInvoiceData(id) {
         ewayBill: 'N/A',
         vehicle: 'KA 01 AB 1234',
         paymentMode: 'Credit',
-        executive: 'Rajesh Kumar',
+        executive: 'Dr. PRASANTH KINJINGI',
         customer: {
             name: 'Apollo Pharmacy Pvt Ltd',
             address: '1st Cross, Gandhi Bazaar<br>Bengaluru, Karnataka 560004',

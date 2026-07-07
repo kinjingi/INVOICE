@@ -923,7 +923,7 @@ window.autoSaveSettings = function() {
     
     const authUser = document.getElementById('settingAuthUser')?.value || 'admin';
     const authPass = document.getElementById('settingAuthPass')?.value || 'admin';
-    const adminName = document.getElementById('settingAdminName')?.value || 'Rajesh Kumar';
+    const adminName = document.getElementById('settingAdminName')?.value || 'Dr. PRASANTH KINJINGI';
     const creditDays = document.getElementById('settingCreditDays')?.value || '30';
 
     const settings = {
