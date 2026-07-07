@@ -3,7 +3,7 @@
    Customers, Products, Invoices, Sales Executives
 ════════════════════════════════════════════════ */
 
-const PH_DATA = {
+window.PH_DATA = {
 
   // ── Company ──────────────────────────────────
   company: {
