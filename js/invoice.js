@@ -956,13 +956,14 @@ const InvoiceModule = (() => {
             const balanceDue = t.grandTotal - (state.amtReceived || 0);
             if (balanceDue !== 0) {
                 cust.outstanding = (cust.outstanding || 0) + balanceDue;
+                if (typeof window.saveCustomerToDB === 'function') window.saveCustomerToDB(cust);
             }
         }
     }
     
-    // Save to local storage
-    if (typeof PH_DATA.saveToStorage === 'function') {
-        PH_DATA.saveToStorage();
+    // Save to Firebase
+    if (typeof window.saveInvoiceToDB === 'function') {
+        window.saveInvoiceToDB(invoice);
     }
     
     AppToast.show('✓ Invoice ' + state.invoiceNumber + ' saved successfully!', 'success');

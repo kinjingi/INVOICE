@@ -180,8 +180,8 @@ window.saveNewProduct = function() {
 
   PH_DATA.products.unshift(newProduct);
   
-  if (typeof PH_DATA.saveToStorage === 'function') {
-    PH_DATA.saveToStorage();
+  if (typeof window.saveProductToDB === 'function') {
+    window.saveProductToDB(newProduct);
   }
 
   document.getElementById('productAddModal').classList.remove('is-open');
@@ -195,8 +195,8 @@ window.saveNewProduct = function() {
 window.deleteProduct = function(code) {
   if (confirm('Are you sure you want to delete this product?')) {
     PH_DATA.products = PH_DATA.products.filter(p => p.code !== code);
-    if (typeof PH_DATA.saveToStorage === 'function') {
-      PH_DATA.saveToStorage();
+    if (typeof window.deleteProductFromDB === 'function') {
+      window.deleteProductFromDB(code);
     }
     window.renderProductsMaster();
     AppToast.show('Product deleted.', 'info');
@@ -289,8 +289,8 @@ function saveNewCustomer() {
 
   // Live update the master list
   PH_DATA.customers.push(newCustomer);
-  if (typeof PH_DATA.saveToStorage === 'function') {
-    PH_DATA.saveToStorage();
+  if (typeof window.saveCustomerToDB === 'function') {
+    window.saveCustomerToDB(newCustomer);
   }
 
   // Close modal
@@ -833,10 +833,12 @@ document.addEventListener('keydown', (e) => {
 });
 
 // ── DOMContentLoaded ──────────────────────────
-document.addEventListener('DOMContentLoaded', () => {
-  if (typeof PH_DATA.loadFromStorage === 'function') {
-    PH_DATA.loadFromStorage();
+document.addEventListener('DOMContentLoaded', async () => {
+  if (typeof window.initFirebaseDB !== 'function') {
+      await new Promise(r => setTimeout(r, 50));
   }
+  await window.initFirebaseDB();
+
   App.init();
 
   // Tab system for Invoice History
