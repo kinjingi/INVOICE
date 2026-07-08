@@ -441,41 +441,102 @@ function renderDashboard() {
   setEl('dash-avg',           PH_DATA.formatCurrency(stats.avgInvoice));
 
   renderActivityFeed();
-  renderDashMiniChart();
+  renderDashMiniChart(stats);
+  renderDashPaymentStatus();
   renderDashRecentInvoices();
+}
+
+function renderDashPaymentStatus() {
+    const invoices = PH_DATA.invoices;
+    let paid = 0, pending = 0, cancelled = 0;
+    
+    invoices.forEach(inv => {
+        if (inv.status === 'cancelled') cancelled++;
+        else if (inv.paymentStatus === 'Paid') paid++;
+        else pending++;
+    });
+    
+    const total = paid + pending + cancelled;
+    const paidPct = total > 0 ? Math.round((paid / total) * 100) : 0;
+    
+    const setEl = (id, val) => { const el = document.getElementById(id); if (el) el.textContent = val; };
+    setEl('dashPaidCount', paid);
+    setEl('dashPendingCount', pending);
+    setEl('dashCancelledCount', cancelled);
+    setEl('dashPaidPercent', paidPct + '%');
 }
 
 function renderActivityFeed() {
   const feed = document.getElementById('activityFeed');
   if (!feed) return;
 
-  const activities = [
-    { type:'success', text: '<strong>PH260700001</strong> — Apollo Pharmacy — ₹30,324 <span style="color:var(--success)">[PAID]</span>', time: '47 mins ago' },
-    { type:'info',    text: 'New invoice <strong>PH260700002</strong> created for MedPlus — ₹69,872', time: '1 hr ago' },
-    { type:'danger',  text: '<strong>PH260700006</strong> — Wellness Forever — CANCELLED', time: '3 hrs ago' },
-    { type:'success', text: 'Payment received from <strong>Manipal Hospitals</strong> — ₹4,11,640', time: '5 hrs ago' },
-    { type:'warning', text: 'Max Healthcare invoice pending — ₹1,53,088', time: 'Yesterday' },
-    { type:'info',    text: 'Auto-backup completed successfully', time: '02:00 AM' },
-    { type:'success', text: '<strong>Hetero Healthcare</strong> invoice paid via UPI — ₹19,683', time: 'Yesterday' },
-  ];
+  const recent = PH_DATA.invoices.slice(0, 8);
+  if (recent.length === 0) {
+      feed.innerHTML = '<div style="padding:20px; text-align:center; color:var(--text-muted);">No recent activity</div>';
+      return;
+  }
 
-  feed.innerHTML = activities.map(a => `
+  feed.innerHTML = recent.map(inv => {
+      let type = 'info';
+      let statusText = '';
+      if (inv.status === 'cancelled') {
+          type = 'danger';
+          statusText = ' - CANCELLED';
+      } else if (inv.paymentStatus === 'Paid') {
+          type = 'success';
+          statusText = ' - PAID';
+      } else {
+          type = 'warning';
+          statusText = ' - PENDING';
+      }
+      return `
     <div class="activity-item">
-      <div class="activity-dot ${a.type}"></div>
+      <div class="activity-dot ${type}"></div>
       <div>
-        <div class="activity-text">${a.text}</div>
-        <div class="activity-time">${a.time}</div>
+        <div class="activity-text"><strong>${inv.number}</strong> — ${inv.custName} — ${PH_DATA.formatCurrency(inv.grandTotal)} <span style="color:var(--${type})">${statusText}</span></div>
+        <div class="activity-time">${inv.date} ${inv.time || ''}</div>
       </div>
-    </div>`).join('');
+    </div>`;
+  }).join('');
 }
 
-function renderDashMiniChart() {
+function renderDashMiniChart(stats) {
   const chart = document.getElementById('dashMiniChart');
   if (!chart) return;
 
-  const hours = ['9','10','11','12','13','14','15','16'];
-  const vals  = [0, 12, 30, 18, 45, 28, 52, 20];
-  const max   = Math.max(...vals);
+  const today = new Date().toISOString().split('T')[0];
+  const todayInv = PH_DATA.invoices.filter(i => i.date === today && i.status !== 'cancelled');
+  
+  const hourCounts = { '9':0, '10':0, '11':0, '12':0, '13':0, '14':0, '15':0, '16':0, '17':0, '18':0 };
+  todayInv.forEach(inv => {
+      if (inv.time) {
+          const hr = inv.time.split(':')[0];
+          const hrNum = parseInt(hr, 10);
+          if (hourCounts[hrNum] !== undefined) hourCounts[hrNum]++;
+          else if (hrNum < 9) hourCounts['9']++;
+          else hourCounts['18']++;
+      }
+  });
+
+  const hours = Object.keys(hourCounts);
+  const vals  = Object.values(hourCounts);
+  const max   = Math.max(...vals, 1);
+  
+  // Find peak hour
+  let peakHour = 'N/A';
+  let peakVal = -1;
+  for (let i=0; i<hours.length; i++) {
+      if (vals[i] > peakVal && vals[i] > 0) {
+          peakVal = vals[i];
+          peakHour = hours[i] + ':00';
+      }
+  }
+  
+  const peakEl = document.getElementById('dashPeakHour');
+  if (peakEl) peakEl.textContent = peakHour;
+  
+  const totalEl = document.getElementById('dashTotalToday');
+  if (totalEl) totalEl.textContent = PH_DATA.formatCurrency(stats ? stats.todayRevenue : 0);
 
   chart.innerHTML = hours.map((h, i) => `
     <div class="mini-bar-wrap">
@@ -541,50 +602,94 @@ function renderInvoiceHistory(filter = 'all') {
       <td><span class="badge ${payMap[inv.paymentStatus] || 'badge-neutral'}">${inv.paymentStatus}</span></td>
       <td>
         <div class="d-flex gap-2">
-          <button class="btn btn-outline btn-sm" onclick="viewInvoice('${inv.number}')">View</button>
-          <button class="btn btn-outline btn-sm" onclick="printInvoice('${inv.number}')">Print</button>
-          <button class="btn btn-outline btn-sm btn-outline-danger" onclick="cancelInvoice('${inv.number}')" ${inv.status === 'cancelled' ? 'disabled' : ''}>Cancel</button>
-          <button class="btn btn-outline btn-sm" style="color: var(--danger); border-color: var(--danger);" onclick="deleteInvoice('${inv.number}')">Delete</button>
+          <button class="btn btn-outline btn-sm" onclick="viewInvoice('${inv.id || inv.number}')">View</button>
+          <button class="btn btn-outline btn-sm" onclick="printInvoice('${inv.id || inv.number}')">Print</button>
+          <button class="btn btn-outline btn-sm btn-outline-danger" onclick="cancelInvoice('${inv.id || inv.number}')" ${inv.status === 'cancelled' ? 'disabled' : ''}>Cancel</button>
+          <button class="btn btn-outline btn-sm" style="color: var(--danger); border-color: var(--danger);" onclick="deleteInvoice('${inv.id || inv.number}')">Delete</button>
         </div>
       </td>
     </tr>`).join('');
 
-  const countEl = document.getElementById('historyCount');
-  if (countEl) countEl.textContent = invoices.length + ' invoices';
 }
 
-window.viewInvoice = function(invNumber) {
-    AppToast.show('Opening preview for invoice ' + invNumber, 'info');
-    window.open('preview.html?id=' + encodeURIComponent(invNumber), '_blank');
-};
-
-window.printInvoice = function(invNumber) {
-    AppToast.show('Opening print view for invoice ' + invNumber, 'info');
-    // Open the preview page and trigger print automatically
-    const win = window.open('preview.html?id=' + encodeURIComponent(invNumber), '_blank');
-    if (win) {
-        win.onload = function() {
-            setTimeout(() => { win.print(); }, 500);
-        };
+window.viewInvoice = function(invId) {
+    const inv = PH_DATA.invoices.find(i => i.id === invId || i.number === invId);
+    if (inv) {
+        AppToast.show('Opening preview for invoice ' + inv.number, 'info');
+        localStorage.setItem('padowa_invoice_' + inv.number, JSON.stringify(inv));
+        window.open('preview.html?id=' + encodeURIComponent(inv.number), '_blank');
     }
 };
 
-window.cancelInvoice = function(invNumber) {
-    const inv = PH_DATA.invoices.find(i => i.number === invNumber);
+window.printInvoice = function(invId) {
+    const inv = PH_DATA.invoices.find(i => i.id === invId || i.number === invId);
+    if (inv) {
+        AppToast.show('Opening print view for invoice ' + inv.number, 'info');
+        localStorage.setItem('padowa_invoice_' + inv.number, JSON.stringify(inv));
+        const win = window.open('preview.html?id=' + encodeURIComponent(inv.number), '_blank');
+        if (win) {
+            win.onload = function() {
+                setTimeout(() => { win.print(); }, 500);
+            };
+        }
+    }
+};
+
+window.cancelInvoice = function(invId) {
+    const inv = PH_DATA.invoices.find(i => i.id === invId || i.number === invId);
     if (inv && inv.status !== 'cancelled') {
         inv.status = 'cancelled';
         inv.paymentStatus = 'Cancelled';
-        AppToast.show('Invoice ' + invNumber + ' has been cancelled', 'warning');
+        
+        // Update customer ledger
+        if (inv.customerId) {
+            const cust = PH_DATA.customers.find(c => c.id === inv.customerId);
+            if (cust) {
+                const balanceDue = (inv.grandTotal || 0) - (inv.amtReceived || 0);
+                if (balanceDue !== 0) {
+                    cust.outstanding = (cust.outstanding || 0) - balanceDue;
+                    if (typeof window.saveCustomerToDB === 'function') {
+                        window.saveCustomerToDB(cust);
+                    }
+                }
+            }
+        }
+        
+        if (typeof window.saveInvoiceToDB === 'function') {
+            window.saveInvoiceToDB(inv);
+        }
+
+        AppToast.show('Invoice ' + inv.number + ' has been cancelled', 'warning');
         renderInvoiceHistory();
         if(typeof renderDashRecentInvoices === 'function') renderDashRecentInvoices();
         if(typeof renderCancelled === 'function') renderCancelled();
     }
 };
 
-window.deleteInvoice = function(invNumber) {
-    if(confirm('Are you sure you want to permanently delete invoice ' + invNumber + '?')) {
-        PH_DATA.invoices = PH_DATA.invoices.filter(i => i.number !== invNumber);
-        AppToast.show('Invoice ' + invNumber + ' deleted successfully', 'error');
+window.deleteInvoice = function(invId) {
+    const inv = PH_DATA.invoices.find(i => i.id === invId || i.number === invId);
+    if (!inv) return;
+    if(confirm('Are you sure you want to permanently delete invoice ' + inv.number + '?')) {
+        // If it wasn't cancelled, we should deduct the balance from customer ledger
+        if (inv.status !== 'cancelled' && inv.customerId) {
+            const cust = PH_DATA.customers.find(c => c.id === inv.customerId);
+            if (cust) {
+                const balanceDue = (inv.grandTotal || 0) - (inv.amtReceived || 0);
+                if (balanceDue !== 0) {
+                    cust.outstanding = (cust.outstanding || 0) - balanceDue;
+                    if (typeof window.saveCustomerToDB === 'function') window.saveCustomerToDB(cust);
+                }
+            }
+        }
+
+        PH_DATA.invoices = PH_DATA.invoices.filter(i => i.id !== inv.id);
+        
+        // save invoices
+        if (typeof window.saveInvoiceToDB === 'function') {
+            localStorage.setItem('ph_invoices', JSON.stringify(PH_DATA.invoices));
+        }
+
+        AppToast.show('Invoice ' + inv.number + ' deleted successfully', 'error');
         renderInvoiceHistory();
         if(typeof renderDashRecentInvoices === 'function') renderDashRecentInvoices();
         if(typeof renderCancelled === 'function') renderCancelled();
@@ -834,14 +939,13 @@ document.addEventListener('keydown', (e) => {
 
 // ── DOMContentLoaded ──────────────────────────
 document.addEventListener('DOMContentLoaded', async () => {
-  // Wait for Firebase module to fully load (it's a type="module" so loads after regular scripts)
   let waited = 0;
   while (typeof window.initFirebaseDB !== 'function' && waited < 5000) {
       await new Promise(r => setTimeout(r, 100));
       waited += 100;
   }
   if (typeof window.initFirebaseDB === 'function') {
-      await window.initFirebaseDB();
+      try { await window.initFirebaseDB(); } catch(e) { console.warn("Init DB failed", e); }
   }
 
   App.init();
@@ -899,6 +1003,21 @@ document.addEventListener('DOMContentLoaded', async () => {
           }
       });
   }
+
+  // Watermark Image Upload
+  const watermarkInput = document.getElementById('settingWatermarkImage');
+  if (watermarkInput) {
+      watermarkInput.addEventListener('change', (e) => {
+          const file = e.target.files[0];
+          if (file) {
+              const reader = new FileReader();
+              reader.onload = (evt) => {
+                  window.currentWatermarkImageBase64 = evt.target.result;
+              };
+              reader.readAsDataURL(file);
+          }
+      });
+  }
 });
 
 window.autoSaveSettings = function() {
@@ -908,6 +1027,7 @@ window.autoSaveSettings = function() {
     const compGSTIN = document.getElementById('settingCompGSTIN')?.value || '29AABCP1234A1Z5';
     const compDL = document.getElementById('settingCompDL')?.value || 'KA-B20-123456 / KA-B21-123457';
     const compEmail = document.getElementById('settingCompEmail')?.value || 'billing@padowahealthcare.com';
+    const compWebsite = document.getElementById('settingCompWebsite')?.value || 'www.padowahealthcare.com';
     
     const bankName = document.getElementById('settingBankName')?.value || 'HDFC Bank';
     const bankBranch = document.getElementById('settingBankBranch')?.value || 'Indiranagar Branch';
@@ -932,7 +1052,7 @@ window.autoSaveSettings = function() {
     const creditDays = document.getElementById('settingCreditDays')?.value || '30';
 
     const settings = {
-        compName, branchName, compPhone, compGSTIN, compDL, compEmail,
+        compName, branchName, compPhone, compGSTIN, compDL, compEmail, compWebsite,
         bankName, bankBranch, accNo, ifsc, address, terms, upi, state, defaultGST,
         printPaperSize, printCopies, printWatermark, printLogo,
         authUser, authPass, adminName, creditDays
@@ -946,6 +1066,18 @@ window.autoSaveSettings = function() {
             try {
                 const existing = JSON.parse(existingStr);
                 if (existing.upiQR) settings.upiQR = existing.upiQR;
+            } catch(e){}
+        }
+    }
+    
+    if (window.currentWatermarkImageBase64) {
+        settings.watermarkImage = window.currentWatermarkImageBase64;
+    } else {
+        const existingStr = localStorage.getItem('padowa_invoice_settings');
+        if (existingStr) {
+            try {
+                const existing = JSON.parse(existingStr);
+                if (existing.watermarkImage) settings.watermarkImage = existing.watermarkImage;
             } catch(e){}
         }
     }
@@ -1002,7 +1134,7 @@ window.saveSettings = function() {
 
 document.addEventListener('DOMContentLoaded', () => {
     const settingIds = [
-        'settingCompName', 'settingBranchName', 'settingCompPhone', 'settingCompGSTIN', 'settingCompDL', 'settingCompEmail',
+        'settingCompName', 'settingBranchName', 'settingCompPhone', 'settingCompGSTIN', 'settingCompDL', 'settingCompEmail', 'settingCompWebsite',
         'settingBankName', 'settingBankBranch', 'settingAccount', 'settingIFSC', 'settingAddress', 'settingUPI', 'settingState',
         'settingInvPrefix', 'settingInvSeq', 'invTerms', 'settingTerms',
         'settingDefaultGST', 'settingPrintPaperSize', 'settingPrintCopies', 'settingPrintWatermark', 'settingPrintLogo',
@@ -1046,6 +1178,7 @@ window.loadSettings = async function() {
             const setCompGSTIN = document.getElementById('settingCompGSTIN');
             const setCompDL = document.getElementById('settingCompDL');
             const setCompEmail = document.getElementById('settingCompEmail');
+            const setCompWebsite = document.getElementById('settingCompWebsite');
             const setBankName = document.getElementById('settingBankName');
             const setBankBranch = document.getElementById('settingBankBranch');
             const setAccount = document.getElementById('settingAccount');
@@ -1060,6 +1193,7 @@ window.loadSettings = async function() {
             if (setCompGSTIN && settings.compGSTIN) setCompGSTIN.value = settings.compGSTIN;
             if (setCompDL && settings.compDL) setCompDL.value = settings.compDL;
             if (setCompEmail && settings.compEmail) setCompEmail.value = settings.compEmail;
+            if (setCompWebsite && settings.compWebsite) setCompWebsite.value = settings.compWebsite;
             
             if (setBankName && settings.bankName) setBankName.value = settings.bankName;
             if (setBankBranch && settings.bankBranch) setBankBranch.value = settings.bankBranch;

@@ -37,8 +37,7 @@ window.initFirebaseDB = async function() {
         if (settingsDoc) {
             window._firebaseSettings = settingsDoc.data();
         }
-
-        console.log("Firebase data loaded successfully");
+        window.renderDashboard();
     } catch(e) {
         console.error("Firebase init failed:", e);
     }
@@ -76,8 +75,13 @@ window.deleteProductFromDB = async function(code) {
 window.saveInvoiceToDB = async function(invoice) {
     try {
         await setDoc(doc(db, "invoices", invoice.id), invoice);
-        await setDoc(doc(db, "metadata", "invoice_seq"), { value: window.PH_DATA.nextInvoiceSeq });
     } catch(e) { console.error("Error saving invoice", e); }
+};
+
+window.deleteInvoiceFromDB = async function(invId) {
+    try {
+        await deleteDoc(doc(db, "invoices", invId));
+    } catch(e) { console.error("Error deleting invoice", e); }
 };
 
 window.saveSettingsToDB = async function(settings) {

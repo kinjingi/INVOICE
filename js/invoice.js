@@ -111,6 +111,8 @@ const InvoiceModule = (() => {
   function renderInvoiceNumber() {
     const el = document.getElementById('invNumberBadge');
     if (el) el.textContent = state.invoiceNumber;
+    const el2 = document.getElementById('invNumberBadge2');
+    if (el2) el2.textContent = state.invoiceNumber;
   }
 
   function renderDateTimeFields() {
@@ -358,7 +360,12 @@ const InvoiceModule = (() => {
     const tbody = document.getElementById('productTbody');
     if (!tbody) return;
     tbody.innerHTML = '';
-    state.rows.forEach((row, idx) => renderRow(row, idx));
+    rowCounter = 0;
+    state.rows.forEach((row, idx) => {
+        row._id = ++rowCounter;
+        const tr = renderRow(row, idx);
+        tbody.appendChild(tr);
+    });
     if (state.rows.length === 0) addRow();
   }
 
@@ -744,10 +751,9 @@ const InvoiceModule = (() => {
     const idx = state.rows.findIndex(r => r._id === rowId);
     if (idx === -1) return;
     state.rows.splice(idx, 1);
+    reRenderTbody();
     if (state.rows.length === 0) {
       addRow(); // always keep at least 1 empty row
-    } else {
-      reRenderTbody();
     }
     AppToast.show('Row deleted', 'info');
   }
@@ -943,9 +949,13 @@ const InvoiceModule = (() => {
 
     // Filter only active rows (with qty > 0 and productName)
     const activeRows = state.rows.filter(r => r.qty > 0 && r.productName);
+    
+    // Attach products to the invoice object so Firebase saves them
+    invoice.products = activeRows;
 
     PH_DATA.invoices.unshift(invoice);
-    // Save latest invoice temporarily to localStorage so preview page can load it for real-time printing
+    // Save per-invoice and latest invoice to localStorage so preview page can load it
+    localStorage.setItem('padowa_invoice_' + invoice.number, JSON.stringify({ ...invoice, products: activeRows }));
     localStorage.setItem('padowa_last_invoice', JSON.stringify({ ...invoice, products: activeRows }));
     
     
@@ -1050,6 +1060,7 @@ const InvoiceModule = (() => {
     if (confirm('Cancel this invoice? This action cannot be undone.')) {
       AppToast.show('Invoice cancelled', 'error');
       resetForm();
+      init();
     }
   }
 
@@ -1080,7 +1091,7 @@ const InvoiceModule = (() => {
     if (tEl) tEl.value = '0';
     const oEl = document.getElementById('invOtherCharges');
     if (oEl) oEl.value = '0';
-    state.invoiceNumber = PH_DATA.generateInvoiceNumber();
+    state.invoiceNumber = '';
 
     const custCard = document.getElementById('customerInfoCard');
     if (custCard) { custCard.classList.remove('is-visible'); custCard.innerHTML = ''; }
@@ -1219,7 +1230,7 @@ const InvoiceModule = (() => {
       const copyLabel = copyLabels[copyIdx] || ('Copy ' + (copyIdx+1));
       let watermarkHtml = '';
       if (printWatermark) {
-          const logoUrl = co.logo || 'https://cdn-icons-png.flaticon.com/512/3004/3004451.png';
+          const logoUrl = settings.watermarkImage || co.logo || 'https://cdn-icons-png.flaticon.com/512/3004/3004451.png';
           watermarkHtml = `<div class="invoice-watermark" style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:400px;height:400px;background-image:url('${logoUrl}');background-size:contain;background-repeat:no-repeat;background-position:center;opacity:0.05;z-index:0;pointer-events:none;"></div>`;
           if (state.isDraft) {
               watermarkHtml += `<div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%) rotate(-45deg);font-size:120px;color:rgba(0,0,0,0.06);font-weight:900;z-index:1;pointer-events:none;white-space:nowrap;">DRAFT</div>`;

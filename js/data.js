@@ -54,11 +54,25 @@ window.PH_DATA = {
     const today = new Date();
     const yy = String(today.getFullYear()).slice(-2);
     const mm = String(today.getMonth() + 1).padStart(2, '0');
-    const seq = String(this.nextInvoiceSeq).padStart(5, '0');
-    this.nextInvoiceSeq++;
-    // Save sequence immediately to prevent numbering gaps on refresh
-    try { localStorage.setItem('padowa_next_invoice_seq', this.nextInvoiceSeq.toString()); } catch(e) {}
-    return `PH${yy}${mm}${seq}`;
+    
+    // Find the highest sequence number for this month
+    const prefix = `PH${yy}${mm}`;
+    let maxSeq = 0;
+    
+    if (this.invoices && this.invoices.length > 0) {
+        for (const inv of this.invoices) {
+            if (inv.number && inv.number.startsWith(prefix)) {
+                const seqStr = inv.number.substring(prefix.length);
+                const seqNum = parseInt(seqStr, 10);
+                if (!isNaN(seqNum) && seqNum > maxSeq) {
+                    maxSeq = seqNum;
+                }
+            }
+        }
+    }
+    
+    const seq = String(maxSeq + 1).padStart(5, '0');
+    return `${prefix}${seq}`;
   },
 
   searchCustomers(query) {

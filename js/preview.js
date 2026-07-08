@@ -105,10 +105,17 @@ function applyPrintPreferences(invoiceId, isDraft) {
         const wm = document.createElement('div');
         wm.className = 'invoice-watermark';
         
-        const logoUrl = (window.opener && window.opener.PH_DATA && window.opener.PH_DATA.company && window.opener.PH_DATA.company.logo) 
-                        ? window.opener.PH_DATA.company.logo 
-                        : 'https://cdn-icons-png.flaticon.com/512/3004/3004451.png';
-                        
+        let logoUrl = 'https://cdn-icons-png.flaticon.com/512/3004/3004451.png';
+        if (window.opener && window.opener.PH_DATA && window.opener.PH_DATA.company && window.opener.PH_DATA.company.logo) {
+            logoUrl = window.opener.PH_DATA.company.logo;
+        }
+        try {
+            const setStr = localStorage.getItem('padowa_invoice_settings');
+            if (setStr) {
+                const settings = JSON.parse(setStr);
+                if (settings.watermarkImage) logoUrl = settings.watermarkImage;
+            }
+        } catch(e) {}
         wm.style.cssText = `position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:400px;height:400px;background-image:url('${logoUrl}');background-size:contain;background-repeat:no-repeat;background-position:center;opacity:0.05;z-index:0;pointer-events:none;`;
         
         if (isDraft) {
@@ -158,8 +165,10 @@ function renderHeader(data) {
             const elCompAddress = document.getElementById('lblCompAddress');
             const elCompPhone = document.getElementById('lblCompPhone');
             const elCompEmail = document.getElementById('lblCompEmail');
+            const elCompWebsite = document.getElementById('lblCompWebsite');
             const elCompGSTIN = document.getElementById('lblCompGSTIN');
             const elCompDL = document.getElementById('lblCompDL');
+            const elCompState = document.getElementById('lblCompState');
             
             if (elBankName) elBankName.textContent = settings.bankName || 'HDFC Bank';
             if (elBankAcc) elBankAcc.textContent = settings.accNo || '50200012345678';
@@ -172,8 +181,10 @@ function renderHeader(data) {
             if (elCompAddress && settings.address) elCompAddress.innerHTML = settings.address.replace(/\n/g, '<br>');
             if (elCompPhone && settings.compPhone) elCompPhone.textContent = settings.compPhone;
             if (elCompEmail && settings.compEmail) elCompEmail.textContent = settings.compEmail;
+            if (elCompWebsite && settings.compWebsite) elCompWebsite.textContent = settings.compWebsite;
             if (elCompGSTIN && settings.compGSTIN) elCompGSTIN.textContent = settings.compGSTIN;
             if (elCompDL && settings.compDL) elCompDL.textContent = settings.compDL;
+            if (elCompState && settings.state) elCompState.textContent = settings.state;
         }
     } catch(e) {
         console.error('Error applying settings to preview:', e);
@@ -393,10 +404,14 @@ function numberToWords(num) {
 // Data Provider
 function mockFetchInvoiceData(id) {
     try {
-        const lastInv = localStorage.getItem('padowa_last_invoice');
-        if (lastInv) {
-            const parsed = JSON.parse(lastInv);
-            if (parsed.number === id || id === 'live') {
+        let invStr = localStorage.getItem('padowa_invoice_' + id);
+        if (!invStr) {
+            invStr = localStorage.getItem('padowa_last_invoice');
+        }
+        
+        if (invStr) {
+            const parsed = JSON.parse(invStr);
+            if (parsed.number === id || id === 'live' || !id) {
                 const cust = parsed.customer || {};
                 // Build a properly formatted address from the customer object
                 const addrParts = [cust.address, cust.city, cust.state].filter(Boolean);
@@ -448,45 +463,28 @@ function mockFetchInvoiceData(id) {
         }
     } catch(e) { console.error('Preview parse error:', e); }
 
-
-    // Fallback Mock
+    // Fallback Error Mock
     return {
         number: id,
-        date: '06/07/2026',
-        time: '14:30',
-        orderNo: 'PO-9912',
-        transport: 'VRL Logistics',
-        lrNo: 'LR-88231',
-        ewayBill: 'N/A',
-        vehicle: 'KA 01 AB 1234',
-        paymentMode: 'Credit',
-        executive: 'Dr. PRASANTH KINJINGI',
+        date: 'Error',
+        time: 'Error',
+        orderNo: '',
+        transport: '',
+        lrNo: '',
+        ewayBill: '',
+        vehicle: '',
+        paymentMode: '',
+        executive: '',
         customer: {
-            name: 'Apollo Pharmacy Pvt Ltd',
-            address: '1st Cross, Gandhi Bazaar<br>Bengaluru, Karnataka 560004',
-            phone: '9876543210',
-            gstin: '29AABCP9999Z1Z5',
-            dl: 'KA-B20-111111',
-            state: 'Karnataka (29)',
-            creditDays: '30 Days',
-            outstanding: '25,450.00'
+            name: 'Invoice Not Found',
+            address: 'Please try regenerating the preview from the history tab.',
+            phone: '',
+            gstin: '',
+            dl: '',
+            state: '',
+            creditDays: '',
+            outstanding: '0.00'
         },
-        products: [
-            {
-                code: 'P001', name: 'Amoxicillin 500mg', composition: 'Amoxicillin Trihydrate IP',
-                pack: '10x10', batch: 'AMX2601', mfg: '01/26', exp: '12/28', hsn: '3004',
-                saleQty: 100, freeQty: 10, mrp: 120.00, ptr: 85.00, pts: 75.00, discountPercent: 2, gstPercent: 12
-            },
-            {
-                code: 'P002', name: 'Paracetamol 650mg', composition: 'Paracetamol IP 650mg',
-                pack: '15x10', batch: 'PAR2602', mfg: '02/26', exp: '01/29', hsn: '3004',
-                saleQty: 50, freeQty: 5, mrp: 45.00, ptr: 32.00, pts: 28.00, discountPercent: 0, gstPercent: 12
-            },
-            {
-                code: 'P045', name: 'Cough Syrup 100ml', composition: 'Dextromethorphan + CPM',
-                pack: '100ml', batch: 'SYR2603', mfg: '03/26', exp: '02/28', hsn: '3004',
-                saleQty: 200, freeQty: 20, mrp: 95.00, ptr: 68.00, pts: 60.00, discountPercent: 5, gstPercent: 12
-            }
-        ]
+        products: []
     };
 }

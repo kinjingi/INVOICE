@@ -158,13 +158,11 @@
   <div class="nav-item" data-page="invoiceHistory">
     <span class="material-icons-outlined">receipt_long</span>
     Invoice History
-    <span class="nav-badge blue">8</span>
   </div>
 
   <div class="nav-item" data-page="drafts">
     <span class="material-icons-outlined">edit_note</span>
     Drafts
-    <span class="nav-badge orange">2</span>
   </div>
 
   <div class="nav-item" data-page="cancelled">
@@ -175,7 +173,6 @@
   <div class="nav-item" data-page="printQueue">
     <span class="material-icons-outlined">print</span>
     Print Queue
-    <span class="nav-badge">5</span>
   </div>
 
   <span class="sidebar-section-label">Analytics</span>
@@ -389,8 +386,8 @@
             <div class="card-body">
               <div class="mini-chart" id="dashMiniChart" style="height:120px;"></div>
               <div class="d-flex justify-between mt-3" style="font-size:11px; color:var(--text-muted);">
-                <span>Peak hour: 14:00</span>
-                <span>Total today: <strong style="color:var(--primary)">₹35,028</strong></span>
+                <span>Peak hour: <span id="dashPeakHour">N/A</span></span>
+                <span>Total today: <strong style="color:var(--primary)" id="dashTotalToday">₹0</strong></span>
               </div>
             </div>
           </div>
@@ -401,22 +398,22 @@
             <div class="card-body text-center">
               <div class="donut-chart" style="margin:12px auto;">
                 <div class="donut-hole">
-                  <span>75%</span>
+                  <span id="dashPaidPercent">0%</span>
                   <small>Paid</small>
                 </div>
               </div>
               <div style="display:flex; flex-direction:column; gap:8px; margin-top:14px; text-align:left;">
                 <div class="d-flex justify-between align-center">
                   <div class="d-flex gap-2 align-center"><div style="width:10px;height:10px;border-radius:2px;background:var(--primary)"></div><span style="font-size:12px;">Paid</span></div>
-                  <span class="badge badge-success">6</span>
+                  <span class="badge badge-success" id="dashPaidCount">0</span>
                 </div>
                 <div class="d-flex justify-between align-center">
                   <div class="d-flex gap-2 align-center"><div style="width:10px;height:10px;border-radius:2px;background:var(--warning)"></div><span style="font-size:12px;">Pending</span></div>
-                  <span class="badge badge-warning">3</span>
+                  <span class="badge badge-warning" id="dashPendingCount">0</span>
                 </div>
                 <div class="d-flex justify-between align-center">
                   <div class="d-flex gap-2 align-center"><div style="width:10px;height:10px;border-radius:2px;background:var(--danger)"></div><span style="font-size:12px;">Cancelled</span></div>
-                  <span class="badge badge-danger">1</span>
+                  <span class="badge badge-danger" id="dashCancelledCount">0</span>
                 </div>
               </div>
             </div>
@@ -441,7 +438,7 @@
               <span class="material-icons-outlined">add_circle</span> Create New Invoice
             </button>
             <button class="btn btn-outline btn-lg" onclick="App.navigate('printQueue')">
-              <span class="material-icons-outlined">print</span> Print Queue (5)
+              <span class="material-icons-outlined">print</span> Print Queue
             </button>
             <button class="btn btn-outline btn-lg" onclick="App.navigate('reports')">
               <span class="material-icons-outlined">bar_chart</span> View Reports
@@ -1157,7 +1154,7 @@
         <div class="page-header">
           <div>
             <h1 class="page-title page-title-gradient">Invoice History</h1>
-            <p class="page-subtitle" id="historyCount">8 invoices · FY 2026-27</p>
+            <p class="page-subtitle">All invoices · FY 2026-27</p>
           </div>
           <div class="d-flex gap-3">
             <button class="btn btn-outline" onclick="AppToast.show('Exporting to Excel...','success')">
@@ -1250,7 +1247,7 @@
           </div>
           <!-- Pagination -->
           <div class="pagination">
-            <span>Showing 1–8 of 8 invoices</span>
+            <span></span>
             <div class="pagination-pages">
               <button class="page-btn"><span class="material-icons-outlined">chevron_left</span></button>
               <button class="page-btn is-active">1</button>
@@ -1537,9 +1534,13 @@
                 </div>
               </div>
               <div class="form-grid form-grid-3 mb-4">
-                <div class="form-group form-grid-span-3">
+                <div class="form-group form-grid-span-2">
                   <label class="form-label">Company Email</label>
                   <input type="email" id="settingCompEmail" class="form-control" value="billing@padowahealthcare.com">
+                </div>
+                <div class="form-group">
+                  <label class="form-label">Company Website</label>
+                  <input type="text" id="settingCompWebsite" class="form-control" value="www.padowahealthcare.com">
                 </div>
               </div>
               <div class="form-group mb-4">
@@ -1620,6 +1621,10 @@
               <div class="form-group mb-3">
                 <label class="form-label">Number of Copies</label>
                 <input type="number" class="form-control" id="settingPrintCopies" value="1" min="1" max="5">
+              </div>
+              <div class="form-group mb-3">
+                <label class="form-label">Watermark Image Upload</label>
+                <input type="file" id="settingWatermarkImage" class="form-control" accept="image/*" style="font-size:13px; padding: 4px;">
               </div>
               <div class="form-group mb-3">
                 <label class="form-label">Show Watermark (DRAFT)</label>
@@ -2441,7 +2446,7 @@
   <script src="js/data.js?v=7"></script>
 <script src="js/invoice.js?v=7"></script>
 <script src="js/app.js?v=7"></script>
-<script type="module" src="js/firebase-backend.js?v=7"></script>
+<script src="js/local-backend.js"></script>
 
 <script>
   // Sync autosave invoice number display
