@@ -22,7 +22,7 @@ document.addEventListener('DOMContentLoaded', () => {
     
     // 5. Detect customer type and apply template adjustments
     const custType = (invoiceData.customer.customerType || '').toLowerCase();
-    const isRetailer = (custType === 'retailer' || custType === 'hospital');
+    const isRetailer = (custType === 'retailer' || custType === 'hospital' || custType === 'b2c');
     if (isRetailer) applyRetailerTemplate();
     
     // 6. Render Products & Calculate Totals
@@ -243,6 +243,9 @@ function applyRetailerTemplate() {
     if (sumPTS && sumPTS.previousElementSibling) {
         sumPTS.previousElementSibling.textContent = 'Total Rate Value';
     }
+      
+    // Change title to RETAIL INVOICE
+    document.querySelectorAll('.invoice-title').forEach(el => { el.textContent = 'RETAIL INVOICE'; });
 }
 
 function renderProducts(products, isRetailer = false) {

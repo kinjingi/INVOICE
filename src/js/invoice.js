@@ -257,7 +257,7 @@ const InvoiceModule = (() => {
   function recalculateRatesBasedOnCustomer() {
     if (!state.customer) return;
     const custType = (state.customer.type || state.customer.paymentType || '').toLowerCase();
-    const isRetailer = (custType === 'retailer' || custType === 'hospital');
+    const isRetailer = (custType === 'retailer' || custType === 'hospital' || custType === 'b2c');
     
     let changed = false;
     state.rows.forEach(row => {
@@ -668,7 +668,7 @@ const InvoiceModule = (() => {
     if (!row) return;
 
     const custType = (state.customer?.type || state.customer?.paymentType || '').toLowerCase();
-    const isRetailer = (custType === 'retailer' || custType === 'hospital');
+    const isRetailer = (custType === 'retailer' || custType === 'hospital' || custType === 'b2c');
     const billingRate = isRetailer ? prod.ptr : prod.rate;
 
     Object.assign(row, {
@@ -1248,7 +1248,7 @@ const InvoiceModule = (() => {
   function buildPrintPreview() {
     // AUTO TEMPLATE SELECTION based on customer type
     const custType = (state.customer && state.customer.type) ? state.customer.type.toLowerCase() : '';
-    if (custType === 'retailer' || custType === 'hospital') {
+    if (custType === 'retailer' || custType === 'hospital' || custType === 'b2c') {
       buildRetailerPrintPreview();
       return;
     }
@@ -1709,7 +1709,7 @@ const InvoiceModule = (() => {
             </div>
           </div>
           <div class="print-title-col">
-            <div class="print-title-text">GST TAX INVOICE</div>
+            <div class="print-title-text">RETAIL INVOICE</div>
             <div class="print-copy-type">${copyLabel}</div>
             <div class="print-inv-type">${state.invoiceType || 'Tax Invoice'}</div>
             <div class="print-barcode-box">*${state.invoiceNumber}*</div>
