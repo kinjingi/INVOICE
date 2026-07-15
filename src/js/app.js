@@ -1218,6 +1218,15 @@ window.handleLogin = function(e) {
         sessionStorage.setItem('padowa_auth_status', 'true');
         document.getElementById('loginOverlay').style.display = 'none';
         AppToast.show('Login successful', 'success');
+        if (typeof window.initFirebaseDB === 'function') {
+            window.initFirebaseDB().then(() => {
+                if (typeof window.renderDashboard === 'function') window.renderDashboard();
+                if (typeof window.renderActivityFeed === 'function') window.renderActivityFeed();
+                if (typeof window.renderDashPaymentStatus === 'function') window.renderDashPaymentStatus();
+            });
+        } else {
+            setTimeout(() => window.location.reload(), 500);
+        }
     } else {
         AppToast.show('Invalid username or password', 'error');
     }

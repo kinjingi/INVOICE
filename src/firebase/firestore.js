@@ -1,4 +1,4 @@
 import { getFirestore } from 'firebase/firestore';
 import { app } from './firebase-config';
 
-export const db = getFirestore(app);
+export const db = app ? getFirestore(app) : null;
