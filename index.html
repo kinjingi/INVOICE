@@ -2332,7 +2332,7 @@
   <div class="modal-overlay" id="productAddModal">
     <div class="modal-content modal" style="max-width:850px; border-radius:12px; overflow:hidden; border:1px solid rgba(255,255,255,0.1);">
       <div class="modal__header">
-        <h2 class="modal__title"><span class="material-icons-outlined" style="color:var(--primary); font-size:24px; vertical-align: middle;">medication</span> Add New Product</h2>
+        <h2 class="modal__title" id="productAddModalTitle"><span class="material-icons-outlined" style="color:var(--primary); font-size:24px; vertical-align: middle;">medication</span> Add New Product</h2>
         <button class="modal__close" onclick="document.getElementById('productAddModal').classList.remove('is-open')"><span class="material-icons-outlined">close</span></button>
       </div>
       <div class="modal__body" style="background:#f8fafc; padding:24px;">
@@ -2442,7 +2442,7 @@
       </div>
       <div class="modal__footer" style="background:#fff; padding: 16px 24px; display: flex; justify-content: flex-end; gap: 12px; border-top: 1px solid var(--border-2);">
         <button class="btn btn-outline" onclick="document.getElementById('productAddModal').classList.remove('is-open')">Cancel</button>
-        <button class="btn btn-primary" onclick="saveNewProduct()">
+        <button class="btn btn-primary" id="productAddSaveBtn" onclick="saveNewProduct()">
           <span class="material-icons-outlined">save</span> Save Product
         </button>
       </div>
