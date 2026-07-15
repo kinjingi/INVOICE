@@ -249,8 +249,42 @@ const InvoiceModule = (() => {
     state.customer = cust;
     renderCustomerCard(cust);
     calculateDueDate();
+    recalculateRatesBasedOnCustomer();
     updateSummaryPanel();
     AppToast.show('Customer selected: ' + cust.name, 'success');
+  }
+
+  function recalculateRatesBasedOnCustomer() {
+    if (!state.customer) return;
+    const custType = (state.customer.type || state.customer.paymentType || '').toLowerCase();
+    const isRetailer = (custType === 'retailer' || custType === 'hospital');
+    
+    let changed = false;
+    state.rows.forEach(row => {
+        if (row.productCode) {
+            // Find the original product to get ptr and rate
+            const prod = PH_DATA.products.find(p => p.code === row.productCode);
+            if (prod) {
+                const newRate = isRetailer ? prod.ptr : prod.rate;
+                if (row.rate !== newRate) {
+                    row.rate = newRate;
+                    // Update DOM element
+                    const tr = document.getElementById('product-row-' + row._id);
+                    if (tr) {
+                        const rateEl = tr.querySelector('[data-field="rate"]');
+                        if (rateEl) rateEl.value = newRate;
+                    }
+                    changed = true;
+                    // Recalculate row totals
+                    calculateRow(row, row._id); 
+                }
+            }
+        }
+    });
+
+    if (changed) {
+        renderInvoiceSummary(calcTotals());
+    }
   }
 
   function calculateDueDate() {
@@ -418,7 +452,7 @@ const InvoiceModule = (() => {
 
     tr.innerHTML = `
       <td class="row-num">${idx + 1}</td>
-      <td><input class="grid-input" data-field="productCode" value="${row.productCode}" placeholder="Code" style="width:70px"></td>
+      <td><div class="autocomplete-wrap" style="min-width:70px"><input class="grid-input" data-field="productCode" value="${row.productCode}" placeholder="Code" style="width:70px"></div></td>
       <td>
         <div class="autocomplete-wrap" style="min-width:160px">
           <input class="grid-input" data-field="productName" value="${row.productName}" placeholder="Search product..." style="width:100%">
@@ -488,6 +522,20 @@ const InvoiceModule = (() => {
       }, 250));
     }
 
+    // Product code autocomplete (live dropdown as user types)
+    const codeInput = tr.querySelector('[data-field="productCode"]');
+    if (codeInput) {
+      codeInput.addEventListener('input', debounce(() => {
+        const val = codeInput.value.trim();
+        if (val.length < 1) return;
+        const results = PH_DATA.products.filter(p =>
+          p.code.toLowerCase().includes(val.toLowerCase()) ||
+          p.name.toLowerCase().includes(val.toLowerCase())
+        ).slice(0, 8);
+        showProductDropdown(results, codeInput, row._id);
+      }, 250));
+    }
+
     // Expiry date validation
     const expiryInput = tr.querySelector('[data-field="expiryDate"]');
     if (expiryInput) {
@@ -503,6 +551,14 @@ const InvoiceModule = (() => {
 
     const field = input.dataset.field;
     let val = input.value;
+
+    if (field === 'productCode' && val) {
+      const prod = PH_DATA.products.find(p => p.code.toLowerCase() === val.toLowerCase());
+      if (prod && row.productCode !== prod.code) {
+        fillProductRow(rowId, prod);
+        return;
+      }
+    }
 
     if (['qty','freeQty','rate','mrp','ptr','discountPct','gstPct'].includes(field)) {
       val = parseFloat(val) || 0;
@@ -611,6 +667,10 @@ const InvoiceModule = (() => {
     const row = state.rows.find(r => r._id === rowId);
     if (!row) return;
 
+    const custType = (state.customer?.type || state.customer?.paymentType || '').toLowerCase();
+    const isRetailer = (custType === 'retailer' || custType === 'hospital');
+    const billingRate = isRetailer ? prod.ptr : prod.rate;
+
     Object.assign(row, {
       productCode:  prod.code,
       productName:  prod.name,
@@ -621,7 +681,7 @@ const InvoiceModule = (() => {
       manufacturer: prod.manufacturer,
       hsn:          prod.hsn,
       gstPct:       prod.gst,
-      rate:         prod.rate,
+      rate:         billingRate,
       mrp:          prod.mrp,
       ptr:          prod.ptr,
     });
@@ -643,7 +703,7 @@ const InvoiceModule = (() => {
     setField('manufacturer', prod.manufacturer);
     setField('hsn',          prod.hsn);
     setField('gstPct',       prod.gst);
-    setField('rate',         prod.rate);
+    setField('rate',         billingRate);
     setField('mrp',          prod.mrp);
     setField('ptr',          prod.ptr);
 
@@ -976,12 +1036,31 @@ const InvoiceModule = (() => {
         window.saveInvoiceToDB(invoice);
     }
     
+    // Update company seq for auto-increment
+    if (PH_DATA.company) {
+        const prefix = document.getElementById('settingInvPrefix')?.value || 'PH';
+        // The prefix in invoiceNumber might include the YYMM, e.g. PH260700009
+        // Just extract the numeric suffix
+        const match = state.invoiceNumber.match(/(\d+)$/);
+        if (match) {
+            const seqNum = parseInt(match[1], 10);
+            if (!isNaN(seqNum)) {
+                PH_DATA.company.invoiceSeq = seqNum + 1;
+                const seqEl = document.getElementById('settingInvSeq');
+                if (seqEl) {
+                    seqEl.value = seqNum + 1;
+                    if (window.autoSaveSettings) window.autoSaveSettings();
+                }
+            }
+        }
+    }
+
     AppToast.show('✓ Invoice ' + state.invoiceNumber + ' saved successfully!', 'success');
     setAutosaveStatus('saved');
 
     // Reset for new invoice and navigate
     resetForm();
-    if (window.App && typeof App.navigate === 'function') {
+    if (typeof App !== 'undefined' && typeof App.navigate === 'function') {
         App.navigate('invoiceHistory');
     }
   }
@@ -989,8 +1068,37 @@ const InvoiceModule = (() => {
   function saveDraft() {
     state.isDraft = true;
     const t = calcTotals();
+    const draftId = 'DRF' + Date.now();
+    const draft = {
+      id: draftId,
+      number: (state.invoiceNumber || 'New') + ' (Draft)',
+      date: state.invoiceDate,
+      customer: state.customer,
+      custName: state.customer ? state.customer.name : 'No Customer Selected',
+      items: t.totalItems,
+      grandTotal: t.grandTotal,
+      status: 'draft',
+      lastSaved: new Date().toISOString(),
+      rawState: JSON.stringify(state) // preserve full state if we want to resume
+    };
+    
+    const activeRows = state.rows.filter(r => r.qty > 0 && r.productName);
+    draft.products = activeRows;
+    
+    PH_DATA.drafts = PH_DATA.drafts || [];
+    PH_DATA.drafts.unshift(draft);
+    
+    if (typeof window.saveDraftsToDB === 'function') {
+        window.saveDraftsToDB(PH_DATA.drafts);
+    }
+    
     AppToast.show('Draft saved – ' + PH_DATA.formatCurrency(t.grandTotal), 'info');
     setAutosaveStatus('saved');
+    
+    resetForm();
+    if (typeof App !== 'undefined' && typeof App.navigate === 'function') {
+        App.navigate('drafts');
+    }
   }
 
   function printInvoice() {
@@ -1080,18 +1188,50 @@ const InvoiceModule = (() => {
   }
 
   function resetForm() {
+    // Reset state to initial defaults
     state.customer     = null;
     state.rows         = [];
     state.amtReceived  = 0;
     state.transport    = 0;
     state.otherCharges = 0;
+    state.invoiceType  = 'Tax Invoice';
+    state.paymentMode  = 'Credit';
+    state.refNumber    = '';
+    state.remarks      = '';
+    state.executive    = '';
+    state.notes        = '';
+    state.txnId        = '';
+    state.isDraft      = false;
+    state.orderNo      = '';
+    state.transportName= '';
+    state.lrNo         = '';
+    state.ewayBill     = '';
     rowCounter         = 0;
+    state.invoiceNumber= '';
 
+    // Reset DOM inputs
     const tEl = document.getElementById('invTransportCharges');
     if (tEl) tEl.value = '0';
     const oEl = document.getElementById('invOtherCharges');
     if (oEl) oEl.value = '0';
-    state.invoiceNumber = '';
+    
+    // Reset Dispatch details
+    const orderNoEl = document.getElementById('invOrderNo');
+    if (orderNoEl) orderNoEl.value = '';
+    const transportEl = document.getElementById('invTransport');
+    if (transportEl) transportEl.value = '';
+    const lrNoEl = document.getElementById('invLRNo');
+    if (lrNoEl) lrNoEl.value = '';
+    const ewayBillEl = document.getElementById('invEwayBill');
+    if (ewayBillEl) ewayBillEl.value = '';
+
+    // Reset select/text fields
+    const execEl = document.getElementById('invExec');
+    if (execEl) execEl.value = '';
+    const typeEl = document.getElementById('invType');
+    if (typeEl) typeEl.value = 'Tax Invoice';
+    const amtEl = document.getElementById('invAmtReceived');
+    if (amtEl) amtEl.value = '';
 
     const custCard = document.getElementById('customerInfoCard');
     if (custCard) { custCard.classList.remove('is-visible'); custCard.innerHTML = ''; }
@@ -1104,7 +1244,20 @@ const InvoiceModule = (() => {
   }
 
   // ── Print Preview Builder ─────────────────────
+  // Routes to the correct template based on customer billing profile
   function buildPrintPreview() {
+    // AUTO TEMPLATE SELECTION based on customer type
+    const custType = (state.customer && state.customer.type) ? state.customer.type.toLowerCase() : '';
+    if (custType === 'retailer' || custType === 'hospital') {
+      buildRetailerPrintPreview();
+      return;
+    }
+    // Default: Distributor / Stockist / B2B / B2C → Distributor Invoice
+    buildDistributorPrintPreview();
+  }
+
+  // ── Distributor Invoice Template (ORIGINAL – DO NOT MODIFY) ───────────────
+  function buildDistributorPrintPreview() {
     const t = calcTotals();
     const c = state.customer || {};
     let co = PH_DATA.company;
@@ -1113,24 +1266,25 @@ const InvoiceModule = (() => {
     let printWatermark = true;
     let printLogo = true;
 
+    let appSettings = {};
     // Override 'co' with settings from localStorage
     try {
         const savedSettings = localStorage.getItem('padowa_invoice_settings');
         if (savedSettings) {
-            const settings = JSON.parse(savedSettings);
+            appSettings = JSON.parse(savedSettings);
             co = {
                 ...co,
-                name: settings.compName || co.name,
-                tagline: settings.branchName || co.tagline,
-                phone: settings.compPhone || co.phone,
-                email: settings.compEmail || co.email,
-                gstin: settings.compGSTIN || co.gstin,
-                drugLicense: settings.compDL || co.drugLicense,
-                address: settings.address || co.address,
+                name: appSettings.compName || co.name,
+                tagline: appSettings.branchName || co.tagline,
+                phone: appSettings.compPhone || co.phone,
+                email: appSettings.compEmail || co.email,
+                gstin: appSettings.compGSTIN || co.gstin,
+                drugLicense: appSettings.compDL || co.drugLicense,
+                address: appSettings.address || co.address,
             };
-            if (settings.printCopies) printCopies = parseInt(settings.printCopies) || 1;
-            if (settings.printWatermark !== undefined) printWatermark = settings.printWatermark;
-            if (settings.printLogo !== undefined) printLogo = settings.printLogo;
+            if (appSettings.printCopies) printCopies = parseInt(appSettings.printCopies) || 1;
+            if (appSettings.printWatermark !== undefined) printWatermark = appSettings.printWatermark;
+            if (appSettings.printLogo !== undefined) printLogo = appSettings.printLogo;
         }
     } catch(e) {}
     const isInter = state.isInterState || false;
@@ -1210,15 +1364,15 @@ const InvoiceModule = (() => {
     try {
         const setStr = localStorage.getItem('padowa_invoice_settings');
         if (setStr) {
-            const settings = JSON.parse(setStr);
-            if (settings.bankName) savedBank = settings.bankName;
-            if (settings.bankBranch) savedBranch = settings.bankBranch;
-            if (settings.accNo) savedAcc = settings.accNo;
-            if (settings.ifsc) savedIFSC = settings.ifsc;
-            if (settings.upi) savedUPI = settings.upi;
-            if (settings.terms) savedTerms = `<div style="white-space: pre-wrap;">${settings.terms}</div>`;
-            if (settings.upiQR) {
-                upiQRHtml = `<img src="${settings.upiQR}" style="width:75px;height:75px;object-fit:cover;">`;
+            appSettings = JSON.parse(setStr);
+            if (appSettings.bankName) savedBank = appSettings.bankName;
+            if (appSettings.bankBranch) savedBranch = appSettings.bankBranch;
+            if (appSettings.accNo) savedAcc = appSettings.accNo;
+            if (appSettings.ifsc) savedIFSC = appSettings.ifsc;
+            if (appSettings.upi) savedUPI = appSettings.upi;
+            if (appSettings.terms) savedTerms = `<div style="white-space: pre-wrap;">${appSettings.terms}</div>`;
+            if (appSettings.upiQR) {
+                upiQRHtml = `<img src="${appSettings.upiQR}" style="width:75px;height:75px;object-fit:cover;">`;
             }
         }
     } catch(e) {}
@@ -1230,7 +1384,7 @@ const InvoiceModule = (() => {
       const copyLabel = copyLabels[copyIdx] || ('Copy ' + (copyIdx+1));
       let watermarkHtml = '';
       if (printWatermark) {
-          const logoUrl = settings.watermarkImage || co.logo || 'https://cdn-icons-png.flaticon.com/512/3004/3004451.png';
+          const logoUrl = appSettings.watermarkImage || co.logo || 'https://cdn-icons-png.flaticon.com/512/3004/3004451.png';
           watermarkHtml = `<div class="invoice-watermark" style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:400px;height:400px;background-image:url('${logoUrl}');background-size:contain;background-repeat:no-repeat;background-position:center;opacity:0.05;z-index:0;pointer-events:none;"></div>`;
           if (state.isDraft) {
               watermarkHtml += `<div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%) rotate(-45deg);font-size:120px;color:rgba(0,0,0,0.06);font-weight:900;z-index:1;pointer-events:none;white-space:nowrap;">DRAFT</div>`;
@@ -1389,7 +1543,7 @@ const InvoiceModule = (() => {
             ${upiQRHtml}
           </div>
           <div class="print-terms">
-            <div style="font-weight:700;margin-bottom:4px;text-transform:uppercase;">Terms & Conditions</div>
+            <div style="font-weight:700;margin-bottom:4px;text-transform:uppercase;">Terms &amp; Conditions</div>
             ${savedTerms}
           </div>
           <div class="print-signature-box">
@@ -1397,7 +1551,302 @@ const InvoiceModule = (() => {
               <div class="company-for">For ${co.name}</div>
             </div>
             <div>
-              <div class="sign-line">Authorized Signatory<br>& Company Seal</div>
+              <div class="sign-line">Authorized Signatory<br>&amp; Company Seal</div>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    `;
+    } // end for loop
+
+    const frame = document.getElementById('printPreviewFrame');
+    if (frame) frame.innerHTML = html;
+  }
+
+  // ── Retailer Invoice Template (NEW – AUTO-SELECTED FOR RETAILER/HOSPITAL) ─
+  // Uses PTR as the billing rate, displayed as "Rate". Removes HSN and PTS columns.
+  // Does NOT change any calculation engine. All totals remain identical.
+  function buildRetailerPrintPreview() {
+    const t = calcTotals();
+    const c = state.customer || {};
+    let co = PH_DATA.company;
+
+    let printCopies = 1;
+    let printWatermark = true;
+    let printLogo = true;
+
+    let appSettings = {};
+    try {
+      const savedSettings = localStorage.getItem('padowa_invoice_settings');
+      if (savedSettings) {
+        appSettings = JSON.parse(savedSettings);
+        co = {
+          ...co,
+          name: appSettings.compName || co.name,
+          tagline: appSettings.branchName || co.tagline,
+          phone: appSettings.compPhone || co.phone,
+          email: appSettings.compEmail || co.email,
+          gstin: appSettings.compGSTIN || co.gstin,
+          drugLicense: appSettings.compDL || co.drugLicense,
+          address: appSettings.address || co.address,
+        };
+        if (appSettings.printCopies) printCopies = parseInt(appSettings.printCopies) || 1;
+        if (appSettings.printWatermark !== undefined) printWatermark = appSettings.printWatermark;
+        if (appSettings.printLogo !== undefined) printLogo = appSettings.printLogo;
+      }
+    } catch(e) {}
+    const isInter = state.isInterState || false;
+
+    // GST summary (same logic as distributor)
+    const gstByRate = {};
+    state.rows.forEach(r => {
+      if (!r.qty || !r.taxableValue) return;
+      const pct = r.gstPct || 0;
+      if (!gstByRate[pct]) gstByRate[pct] = { taxable: 0, cgst: 0, sgst: 0, igst: 0 };
+      gstByRate[pct].taxable += r.taxableValue;
+      gstByRate[pct].cgst    += r.cgst;
+      gstByRate[pct].sgst    += r.sgst;
+      gstByRate[pct].igst    += r.igst;
+    });
+
+    const gstRows = Object.entries(gstByRate).map(([pct, g]) => `
+      <tr>
+        <td>${pct}%</td>
+        <td>${PH_DATA.formatNum(g.taxable)}</td>
+        <td>${PH_DATA.formatNum(g.cgst)}</td>
+        <td>${PH_DATA.formatNum(g.sgst)}</td>
+        <td>${PH_DATA.formatNum(g.igst)}</td>
+        <td>${PH_DATA.formatNum(g.cgst + g.sgst + g.igst)}</td>
+      </tr>`).join('');
+
+    // RETAILER product rows: S.No | Code | Product Name & Composition | Pack | Batch | Mfg | Exp | Qty | Free | MRP | Rate(=PTR) | Disc% | Taxable | GST% | Net Amount
+    // Removed: HSN, PTS(Rate column from distributor) — PTR is shown as "Rate"
+    const productRows = state.rows.filter(r => r.qty > 0).map((r, i) => `
+      <tr>
+        <td>${i + 1}</td>
+        <td class="text-l mono">${r.productCode || 'PRD'}</td>
+        <td class="text-l" style="font-weight:700;">${r.productName || ''}<br><span style="font-weight:400;font-size:9px;color:#555;">${r.composition || ''}</span></td>
+        <td>${r.pack || ''}</td>
+        <td class="mono">${r.batchNo || ''}</td>
+        <td>${r.mfgDate ? r.mfgDate.substring(0,7).replace('-','/') : ''}</td>
+        <td>${r.expiryDate ? r.expiryDate.substring(0,7).replace('-','/') : ''}</td>
+        <td class="mono">${r.qty || 0}</td>
+        <td class="mono">${r.freeQty || 0}</td>
+        <td class="text-r mono">${PH_DATA.formatNum(r.mrp || 0)}</td>
+        <td class="text-r mono">${PH_DATA.formatNum(r.ptr || 0)}</td>
+        <td class="text-r mono">${r.discountPct > 0 ? r.discountPct+'%' : ''}</td>
+        <td class="text-r mono">${PH_DATA.formatNum(r.taxableValue || 0)}</td>
+        <td>${r.gstPct || 0}%</td>
+        <td class="text-r mono" style="font-weight:700">${PH_DATA.formatNum(r.total || 0)}</td>
+      </tr>`).join('');
+
+    let savedBank = PH_DATA.company.bank;
+    let savedBranch = 'Indiranagar Branch';
+    let savedAcc = PH_DATA.company.accNo;
+    let savedIFSC = PH_DATA.company.ifsc;
+    let savedUPI = PH_DATA.company.upi;
+    let savedTerms = `
+      <ol style="margin-top:6px; padding-left:18px;">
+        <li>Subject to Bengaluru jurisdiction only.</li>
+        <li>Interest @24% per annum will be charged after due date.</li>
+        <li>Please verify goods immediately upon delivery.</li>
+        <li>E.&O.E.</li>
+        <li>Payment within agreed credit period.</li>
+        <li>Damaged goods accepted only with approval.</li>
+        <li>Company reserves the right to change prices without notice.</li>
+      </ol>
+    `;
+    let upiQRHtml = `<div class="print-qr">QR<br>Code</div>`;
+
+    try {
+      const setStr = localStorage.getItem('padowa_invoice_settings');
+      if (setStr) {
+        appSettings = JSON.parse(setStr);
+        if (appSettings.bankName) savedBank = appSettings.bankName;
+        if (appSettings.bankBranch) savedBranch = appSettings.bankBranch;
+        if (appSettings.accNo) savedAcc = appSettings.accNo;
+        if (appSettings.ifsc) savedIFSC = appSettings.ifsc;
+        if (appSettings.upi) savedUPI = appSettings.upi;
+        if (appSettings.terms) savedTerms = `<div style="white-space: pre-wrap;">${appSettings.terms}</div>`;
+        if (appSettings.upiQR) {
+          upiQRHtml = `<img src="${appSettings.upiQR}" style="width:75px;height:75px;object-fit:cover;">`;
+        }
+      }
+    } catch(e) {}
+
+    let html = '';
+    const copyLabels = ['Original for Recipient', 'Duplicate for Transporter', 'Triplicate for Supplier', 'Quadruplicate', 'Quintuplicate'];
+
+    for (let copyIdx = 0; copyIdx < printCopies; copyIdx++) {
+      const copyLabel = copyLabels[copyIdx] || ('Copy ' + (copyIdx+1));
+      let watermarkHtml = '';
+      if (printWatermark) {
+        const logoUrl = appSettings.watermarkImage || co.logo || 'https://cdn-icons-png.flaticon.com/512/3004/3004451.png';
+        watermarkHtml = `<div class="invoice-watermark" style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:400px;height:400px;background-image:url('${logoUrl}');background-size:contain;background-repeat:no-repeat;background-position:center;opacity:0.05;z-index:0;pointer-events:none;"></div>`;
+        if (state.isDraft) {
+          watermarkHtml += `<div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%) rotate(-45deg);font-size:120px;color:rgba(0,0,0,0.06);font-weight:900;z-index:1;pointer-events:none;white-space:nowrap;">DRAFT</div>`;
+        }
+      }
+
+      html += `
+      <div class="print-doc" ${copyIdx===0 ? 'id="printableInvoice"' : ''} style="${copyIdx > 0 ? 'page-break-before: always;' : ''} position:relative;">
+        ${watermarkHtml}
+        <!-- HEADER (identical to distributor) -->
+        <div class="print-header" style="position:relative;z-index:1;">
+          <div class="print-company-col">
+            <div class="print-company-logo-wrap">
+              ${printLogo ? '<div class="print-logo-box">PH</div>' : ''}
+              <div>
+                <div class="print-company-name">${co.name}</div>
+                <div class="print-tagline">${co.tagline}</div>
+              </div>
+            </div>
+            <div class="print-co-details">
+              <strong>Reg Office:</strong> ${co.address}<br>
+              <strong>Phone:</strong> ${co.phone} | <strong>Email:</strong> ${co.email}<br>
+              <strong>GSTIN:</strong> ${co.gstin} | <strong>DL No:</strong> ${co.drugLicense}
+            </div>
+          </div>
+          <div class="print-title-col">
+            <div class="print-title-text">GST TAX INVOICE</div>
+            <div class="print-copy-type">${copyLabel}</div>
+            <div class="print-inv-type">${state.invoiceType || 'Tax Invoice'}</div>
+            <div class="print-barcode-box">*${state.invoiceNumber}*</div>
+          </div>
+          <div class="print-info-col">
+            <table class="print-info-table">
+              <tr><td class="lbl">Invoice No</td><td class="val">${state.invoiceNumber}</td></tr>
+              <tr><td class="lbl">Date</td><td class="val">${state.invoiceDate}</td></tr>
+              <tr><td class="lbl">Due Date</td><td class="val">${state.invoiceDueDate || 'N/A'}</td></tr>
+              <tr><td class="lbl">Time</td><td class="val">${state.invoiceTime}</td></tr>
+              <tr><td class="lbl">Fin Year</td><td class="val">${co.fy}</td></tr>
+              <tr><td class="lbl">Order No</td><td class="val">${state.orderNo || 'N/A'}</td></tr>
+              <tr><td class="lbl">E-Way Bill</td><td class="val">${state.ewayBill || 'N/A'}</td></tr>
+              <tr><td class="lbl">LR No</td><td class="val">${state.lrNo || 'N/A'}</td></tr>
+              <tr><td class="lbl">Transport</td><td class="val">${state.transportName || 'N/A'}</td></tr>
+              <tr><td class="lbl">Sales Exec</td><td class="val">${state.executive || 'Admin'}</td></tr>
+            </table>
+          </div>
+        </div>
+
+        <!-- CUSTOMER DETAILS (identical to distributor) -->
+        <div class="print-customer-details">
+          <div class="print-cust-col">
+            <div class="print-cust-title">Billed To</div>
+            <table class="cust-grid-table">
+              <tr><td class="lbl">Customer</td><td class="val cust-name-val">${c.name || ''}</td></tr>
+              <tr><td class="lbl">Address</td><td class="val">${c.address || ''}, ${c.city || ''} - ${c.pincode || ''}</td></tr>
+              <tr><td class="lbl">Contact</td><td class="val">${c.phone || ''}</td></tr>
+              <tr><td class="lbl">GSTIN</td><td class="val" style="font-weight:700;">${c.gstin || 'Unregistered'}</td></tr>
+              <tr><td class="lbl">Drug Lic</td><td class="val">${c.drugLicense || ''}</td></tr>
+              <tr><td class="lbl">FSSAI</td><td class="val">${c.fssai || ''}</td></tr>
+            </table>
+          </div>
+          <div class="print-cust-col">
+            <div class="print-cust-title">Shipped To (Place of Supply)</div>
+            <table class="cust-grid-table">
+              <tr><td class="lbl">Customer</td><td class="val cust-name-val">${c.name || ''}</td></tr>
+              <tr><td class="lbl">Address</td><td class="val">${c.shippingAddress || c.address || ''}, ${c.city || ''} - ${c.pincode || ''}</td></tr>
+              <tr><td class="lbl">State</td><td class="val">${c.state || ''} (${c.stateCode || ''})</td></tr>
+              <tr><td class="lbl">Place of Supply</td><td class="val">${c.placeOfSupply || c.state || ''}</td></tr>
+              <tr><td class="lbl">Credit Days</td><td class="val">${c.creditDays || '30'} Days</td></tr>
+              <tr><td class="lbl">Outstanding</td><td class="val">₹ ${PH_DATA.formatNum(c.outstanding || 0)}</td></tr>
+            </table>
+          </div>
+        </div>
+
+        <!-- RETAILER PRODUCT TABLE: No HSN, No PTS; PTR shown as "Rate" -->
+        <table class="print-product-table print-border-table">
+          <thead>
+            <tr>
+              <th>S.No</th><th>Code</th><th>Product Name &amp; Composition</th>
+              <th>Pack</th><th>Batch</th><th>Mfg</th><th>Exp</th>
+              <th>Qty</th><th>Free</th><th>MRP</th>
+              <th>Rate</th><th>Disc%</th><th>Taxable</th><th>GST%</th><th>Net Amount</th>
+            </tr>
+          </thead>
+          <tbody>${productRows}</tbody>
+          <tfoot>
+            <tr>
+              <td colspan="7" class="text-r" style="font-weight:700;">TOTAL</td>
+              <td class="mono" style="font-weight:700;">${t.totalQty}</td>
+              <td class="mono" style="font-weight:700;">${t.freeQty}</td>
+              <td colspan="3"></td>
+              <td class="text-r mono" style="font-weight:700;">${PH_DATA.formatNum(t.taxable)}</td>
+              <td></td>
+              <td class="text-r mono" style="font-weight:800;color:#0057D9;">${PH_DATA.formatNum(t.preRound)}</td>
+            </tr>
+          </tfoot>
+        </table>
+
+        <!-- SUMMARY AREA (identical to distributor) -->
+        <div class="print-summary-wrap">
+          <div class="print-summary-left">
+            <div class="print-amt-words">
+              Amount in words: Rupees ${PH_DATA.numberToWords(t.grandTotal)}
+            </div>
+            <table class="gst-box-table print-border-table">
+              <thead>
+                <tr>
+                  <th>GST %</th><th>Taxable(₹)</th><th>CGST(₹)</th><th>SGST(₹)</th><th>IGST(₹)</th><th>Total GST(₹)</th>
+                </tr>
+              </thead>
+              <tbody>${gstRows}</tbody>
+              <tfoot>
+                <tr>
+                  <th style="text-align:center">Total</th>
+                  <th>${PH_DATA.formatNum(t.taxable)}</th>
+                  <th>${PH_DATA.formatNum(t.cgst)}</th>
+                  <th>${PH_DATA.formatNum(t.sgst)}</th>
+                  <th>${PH_DATA.formatNum(t.igst)}</th>
+                  <th>${PH_DATA.formatNum(t.cgst+t.sgst+t.igst)}</th>
+                </tr>
+              </tfoot>
+            </table>
+          </div>
+          <div class="print-summary-right">
+            <table class="inv-summary-table">
+              <tr><td class="lbl">Total Products</td><td class="val">${t.totalItems}</td></tr>
+              <tr><td class="lbl">Total Qty (Incl. Free)</td><td class="val">${t.totalQty + t.freeQty}</td></tr>
+              <tr><td class="lbl">Gross Amount</td><td class="val">${PH_DATA.formatNum(t.gross)}</td></tr>
+              <tr><td class="lbl">Discount</td><td class="val">- ${PH_DATA.formatNum(t.discAmt)}</td></tr>
+              <tr><td class="lbl">Taxable Amount</td><td class="val">${PH_DATA.formatNum(t.taxable)}</td></tr>
+              <tr><td class="lbl">CGST</td><td class="val">${PH_DATA.formatNum(t.cgst)}</td></tr>
+              <tr><td class="lbl">SGST</td><td class="val">${PH_DATA.formatNum(t.sgst)}</td></tr>
+              <tr><td class="lbl">IGST</td><td class="val">${PH_DATA.formatNum(t.igst)}</td></tr>
+              <tr><td class="lbl">Transport Charges</td><td class="val">${PH_DATA.formatNum(state.transport||0)}</td></tr>
+              <tr><td class="lbl">Other Charges</td><td class="val">${PH_DATA.formatNum(state.otherCharges||0)}</td></tr>
+              <tr><td class="lbl">Round Off</td><td class="val">${t.roundOff >= 0 ? '+' : ''}${PH_DATA.formatNum(t.roundOff)}</td></tr>
+              <tr class="grand-total-row"><td class="lbl">GRAND TOTAL</td><td class="val">₹ ${PH_DATA.formatNum(t.grandTotal)}</td></tr>
+              <tr><td class="lbl">Amount Received</td><td class="val">${PH_DATA.formatNum(state.amtReceived||0)}</td></tr>
+              <tr><td class="lbl">Balance Due</td><td class="val" style="color:#d32f2f;">${PH_DATA.formatNum(t.grandTotal - (state.amtReceived||0))}</td></tr>
+            </table>
+          </div>
+        </div>
+
+        <!-- FOOTER: BANK, TERMS, SIGNATURES (identical to distributor) -->
+        <div class="print-footer-grid">
+          <div class="print-bank-details">
+            <div style="font-weight:700;margin-bottom:4px;text-transform:uppercase;">Bank Details</div>
+            <strong>A/C Name:</strong> ${co.name}<br>
+            <strong>Bank:</strong> ${savedBank}<br>
+            <strong>Branch:</strong> ${savedBranch}<br>
+            <strong>A/C No:</strong> ${savedAcc}<br>
+            <strong>IFSC:</strong> ${savedIFSC}<br>
+            <strong>UPI ID:</strong> ${savedUPI}<br>
+            ${upiQRHtml}
+          </div>
+          <div class="print-terms">
+            <div style="font-weight:700;margin-bottom:4px;text-transform:uppercase;">Terms &amp; Conditions</div>
+            ${savedTerms}
+          </div>
+          <div class="print-signature-box">
+            <div>
+              <div class="company-for">For ${co.name}</div>
+            </div>
+            <div>
+              <div class="sign-line">Authorized Signatory<br>&amp; Company Seal</div>
             </div>
           </div>
         </div>
@@ -1451,11 +1900,55 @@ const InvoiceModule = (() => {
     return (...args) => { clearTimeout(t); t = setTimeout(() => fn(...args), delay); };
   }
 
+  function resumeState(parsedState) {
+    Object.assign(state, parsedState);
+    state.autosaveTimer = null;
+    
+    renderInvoiceNumber();
+    renderDateTimeFields();
+    
+    if (state.customer) {
+      const custCard = document.getElementById('customerInfoCard');
+      if (custCard) {
+        custCard.innerHTML = `
+          <div style="display:flex; justify-content:space-between;">
+            <div>
+              <div style="font-weight:700; color:var(--text-dark);">${state.customer.name}</div>
+              <div style="font-size:12px; color:var(--text-muted); margin-top:4px;">
+                ${state.customer.address}, ${state.customer.city}, ${state.customer.state} - ${state.customer.pincode}
+              </div>
+            </div>
+          </div>
+        `;
+        custCard.classList.add('is-visible');
+      }
+      const si = document.getElementById('custSearch');
+      if (si) si.value = state.customer.name;
+    }
+    
+    document.querySelectorAll('.payment-toggle').forEach(b => {
+      b.classList.remove('is-active');
+      if (b.dataset.mode === state.paymentMode) b.classList.add('is-active');
+    });
+    toggleRefFieldVisibility();
+    
+    const execEl = document.getElementById('invExec');
+    if (execEl && state.executive) execEl.value = typeof state.executive === 'object' ? state.executive.id : state.executive;
+    
+    const typeEl = document.getElementById('invType');
+    if (typeEl) typeEl.value = state.invoiceType;
+    
+    rowCounter = Math.max(0, ...state.rows.map(r => parseInt(String(r._id).replace('r','')) || 0));
+    renderProductGrid();
+    updateSummaryPanel();
+  }
+
   // ── Public API ────────────────────────────────
   return {
     init, addRow, duplicateRow, deleteRow,
     moveRowUp, moveRowDown,
     updateSummaryPanel, buildPrintPreview, printInvoice, populateStep6Settings,
+    resumeState,
     // Called by customer add modal to auto-select the new customer
     selectCustomerById(id) {
       const cust = PH_DATA.getCustomerById(id);

@@ -62,12 +62,14 @@ window.deleteInvoiceFromDB = async function(invId) {
     localStorage.setItem('ph_invoices', JSON.stringify(window.PH_DATA.invoices));
 };
 
-window.saveInvoiceToDB = async function(invoice) {
+window.saveInvoiceToDB = async function(invoice, isUpdate = false) {
     localStorage.setItem('ph_invoices', JSON.stringify(window.PH_DATA.invoices));
     
-    // Increment invoice sequence and save it
-    window.PH_DATA.nextInvoiceSeq++;
-    localStorage.setItem('padowa_next_invoice_seq', window.PH_DATA.nextInvoiceSeq.toString());
+    // Increment invoice sequence and save it only if it's a new invoice
+    if (!isUpdate) {
+        window.PH_DATA.nextInvoiceSeq++;
+        localStorage.setItem('padowa_next_invoice_seq', window.PH_DATA.nextInvoiceSeq.toString());
+    }
     
     // Save new customer if it doesn't exist
     if (invoice.customer && invoice.customer.name) {

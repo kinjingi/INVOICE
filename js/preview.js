@@ -20,10 +20,15 @@ document.addEventListener('DOMContentLoaded', () => {
     // 4. Render Customer
     renderCustomer(invoiceData);
     
-    // 5. Render Products & Calculate Totals
-    const totals = renderProducts(invoiceData.products);
+    // 5. Detect customer type and apply template adjustments
+    const custType = (invoiceData.customer.customerType || '').toLowerCase();
+    const isRetailer = (custType === 'retailer' || custType === 'hospital');
+    if (isRetailer) applyRetailerTemplate();
     
-    // 6. Render Summaries
+    // 6. Render Products & Calculate Totals
+    const totals = renderProducts(invoiceData.products, isRetailer);
+    
+    // 7. Render Summaries
     renderGstSummary(totals.gstBreakdown);
     renderBillSummary(totals);
 
@@ -226,7 +231,22 @@ function renderCustomer(data) {
     document.getElementById('lblOutstanding').textContent = `Rs. ${data.customer.outstanding || '0.00'}`;
 }
 
-function renderProducts(products) {
+// ── Retailer Template: hide HSN, PTS cols; label PTR as "Rate" ───────────
+function applyRetailerTemplate() {
+    // Hide HSN column (th + all td in that position)
+    document.querySelectorAll('.col-hsn').forEach(el => el.style.display = 'none');
+    document.querySelectorAll('.col-pts').forEach(el => el.style.display = 'none');
+    // Relabel PTR header to "Rate"
+    document.querySelectorAll('.col-ptr-label').forEach(el => { el.textContent = 'Rate'; });
+    // Relabel "Total PTS Value" to "Total Rate Value" in summary box
+    const sumPTS = document.getElementById('sumPTS');
+    if (sumPTS && sumPTS.previousElementSibling) {
+        sumPTS.previousElementSibling.textContent = 'Total Rate Value';
+    }
+}
+
+function renderProducts(products, isRetailer = false) {
+
     const tbody = document.getElementById('productTbody');
     let html = '';
     
@@ -300,12 +320,12 @@ function renderProducts(products) {
             <td>${p.batch}</td>
             <td>${p.mfg}</td>
             <td>${p.exp}</td>
-            <td>${p.hsn}</td>
+            ${isRetailer ? '' : `<td class="col-hsn">${p.hsn}</td>`}
             <td class="text-right bold">${p.saleQty}</td>
             <td class="text-right">${p.freeQty}</td>
             <td class="text-right">${p.mrp.toFixed(2)}</td>
             <td class="text-right">${p.ptr.toFixed(2)}</td>
-            <td class="text-right bold">${p.pts.toFixed(2)}</td>
+            ${isRetailer ? '' : `<td class="col-pts text-right bold">${p.pts.toFixed(2)}</td>`}
             <td class="text-right">${p.discountPercent}%</td>
             <td class="text-right">${taxableValue.toFixed(2)}</td>
             <td class="text-right">${p.gstPercent}%</td>
@@ -439,7 +459,8 @@ function mockFetchInvoiceData(id) {
                         state: (cust.state ? cust.state + (cust.stateCode ? ' (' + cust.stateCode + ')' : '') : 'N/A'),
                         creditDays: cust.creditDays ? cust.creditDays + ' Days' : 'N/A',
                         outstanding: cust.outstanding !== undefined ? cust.outstanding.toFixed(2) : '0.00',
-                        paymentType: cust.paymentType || cust.type || 'Credit'
+                        paymentType: cust.paymentType || cust.type || 'Credit',
+                        customerType: cust.type || cust.paymentType || 'B2B'
                     },
                     products: (parsed.products || []).map(p => ({
                         code: p.productCode || 'N/A',

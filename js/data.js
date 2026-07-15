@@ -9,18 +9,18 @@ window.PH_DATA = {
   company: {
     name:       'PADOWA Healthcare',
     tagline:    'Ethical Pharmaceutical Marketing',
-    address:    '42, Pharma Tower, MG Road, Bengaluru – 560001, Karnataka',
-    gstin:      '29AABCP1234A1Z5',
-    drugLicense:'DL-KA-2024-00145 | DL-KA-2024-00146',
-    phone:      '+91 80 4567 8901',
+    address:    '42, Pharma Tower, MG Road, Vijayawada – 520001, Andhra Pradesh',
+    gstin:      '37AABCP1234A1Z5',
+    drugLicense:'DL-AP-2024-00145 | DL-AP-2024-00146',
+    phone:      '+91 866 4567 8901',
     email:      'billing@padowahealthcare.com',
     website:    'www.padowahealthcare.com',
-    bank:       'HDFC Bank, Indiranagar Branch',
+    bank:       'HDFC Bank, Vijayawada Branch',
     accNo:      '50200012345678',
     ifsc:       'HDFC0001234',
     upi:        'padowahealthcare@hdfcbank',
-    state:      'Karnataka',
-    stateCode:  '29',
+    state:      'Andhra Pradesh',
+    stateCode:  '37',
     fy:         '2026-27',
   },
 
@@ -87,7 +87,7 @@ window.PH_DATA = {
   },
 
   searchProducts(query) {
-    if (!query || query.length < 2) return [];
+    if (!query || query.length < 1) return [];
     const q = query.toLowerCase();
     return this.products.filter(p =>
       p.name.toLowerCase().includes(q) ||

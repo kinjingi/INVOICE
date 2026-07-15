@@ -120,7 +120,10 @@ window.renderProductsMaster = function() {
         <span style="background:var(--bg-light); padding:2px 6px; border-radius:4px; font-size:11px; font-weight:600;">${p.gst}%</span>
       </td>
       <td class="text-center">
-        <button class="btn btn-outline btn-sm" onclick="AppToast.show('Edit product disabled in demo','info')" style="padding:4px 8px; margin-right:4px;" title="Edit">
+        <button class="btn btn-outline btn-sm" onclick="viewProduct('${p.code}')" style="padding:4px 8px; margin-right:4px;" title="View">
+          <span class="material-icons-outlined" style="font-size:16px;">visibility</span>
+        </button>
+        <button class="btn btn-outline btn-sm" onclick="editProduct('${p.code}')" style="padding:4px 8px; margin-right:4px;" title="Edit">
           <span class="material-icons-outlined" style="font-size:16px;">edit</span>
         </button>
         <button class="btn btn-outline btn-sm" onclick="deleteProduct('${p.code}')" style="padding:4px 8px; color:var(--danger); border-color:var(--danger);" title="Delete">
@@ -136,8 +139,51 @@ window.renderProductsMaster = function() {
 
 window.openProductAddModal = function() {
   resetProductAddForm();
+  document.getElementById('productAddModalTitle').textContent = 'Add New Product';
+  document.getElementById('productAddSaveBtn').style.display = 'block';
+  Array.from(document.getElementById('productAddForm').elements).forEach(el => el.disabled = false);
+  document.getElementById('np_code').disabled = true; // Always read-only or auto-generated
+  
   document.getElementById('productAddModal').classList.add('is-open');
   setTimeout(() => document.getElementById('np_name')?.focus(), 100);
+};
+
+window.editProduct = function(code) {
+  const prod = PH_DATA.products.find(p => p.code === code);
+  if (!prod) return;
+  
+  resetProductAddForm();
+  document.getElementById('productAddModalTitle').textContent = 'Edit Product';
+  document.getElementById('productAddSaveBtn').style.display = 'block';
+  
+  // Enable inputs
+  Array.from(document.getElementById('productAddForm').elements).forEach(el => el.disabled = false);
+  document.getElementById('np_code').disabled = true; // Don't allow changing code
+  
+  // Populate form
+  document.getElementById('np_code').value = prod.code || '';
+  document.getElementById('np_name').value = prod.name || '';
+  document.getElementById('np_composition').value = prod.composition || '';
+  document.getElementById('np_manufacturer').value = prod.manufacturer || '';
+  document.getElementById('np_strength').value = prod.strength || '';
+  document.getElementById('np_dosageForm').value = prod.dosageForm || '';
+  document.getElementById('np_pack').value = prod.pack || '';
+  document.getElementById('np_category').value = prod.category || '';
+  document.getElementById('np_hsn').value = prod.hsn || '';
+  document.getElementById('np_gst').value = prod.gst || 12;
+  document.getElementById('np_mrp').value = prod.mrp || 0;
+  document.getElementById('np_ptr').value = prod.ptr || 0;
+  document.getElementById('np_rate').value = (prod.rate || prod.pts) || 0;
+
+  document.getElementById('productAddModal').classList.add('is-open');
+};
+
+window.viewProduct = function(code) {
+  window.editProduct(code);
+  document.getElementById('productAddModalTitle').textContent = 'View Product';
+  document.getElementById('productAddSaveBtn').style.display = 'none';
+  // Disable all inputs
+  Array.from(document.getElementById('productAddForm').elements).forEach(el => el.disabled = true);
 };
 
 window.resetProductAddForm = function() {
@@ -178,14 +224,22 @@ window.saveNewProduct = function() {
     stock: 100 // Default stock
   };
 
-  PH_DATA.products.unshift(newProduct);
+  const existingIndex = PH_DATA.products.findIndex(p => p.code === newProduct.code);
+  if (existingIndex !== -1) {
+    // Preserve stock if editing
+    newProduct.stock = PH_DATA.products[existingIndex].stock;
+    PH_DATA.products[existingIndex] = newProduct;
+    AppToast.show('✓ Product "' + newProduct.name + '" updated successfully!', 'success');
+  } else {
+    PH_DATA.products.unshift(newProduct);
+    AppToast.show('✓ Product "' + newProduct.name + '" added successfully!', 'success');
+  }
   
   if (typeof window.saveProductToDB === 'function') {
     window.saveProductToDB(newProduct);
   }
 
   document.getElementById('productAddModal').classList.remove('is-open');
-  AppToast.show('✓ Product "' + newProduct.name + '" added successfully!', 'success');
   
   if (typeof window.renderProductsMaster === 'function') {
     window.renderProductsMaster();
@@ -310,7 +364,8 @@ const App = (() => {
 
   const pages = [
     'dashboard', 'newInvoice', 'invoiceHistory',
-    'drafts', 'cancelled', 'printQueue', 'reports', 'settings', 'customers', 'products'
+    'drafts', 'cancelled', 'printQueue', 'reports', 'settings', 'customers', 'products',
+    'gstDashboard', 'gstr1', 'gstr3b', 'gstReports', 'filingHistory', 'gstSettings'
   ];
 
   let currentPage = 'dashboard';
@@ -351,6 +406,13 @@ const App = (() => {
     if (page === 'printQueue')      renderPrintQueue();
     if (page === 'customers')       renderCustomersLedger();
     if (page === 'products')        renderProductsMaster();
+    // GST Module pages
+    if (page === 'gstDashboard')    { if(typeof renderGSTDashboard==='function') renderGSTDashboard(); }
+    if (page === 'gstr1')           { if(typeof renderGSTR1==='function') renderGSTR1(); }
+    if (page === 'gstr3b')          { if(typeof renderGSTR3B==='function') renderGSTR3B(); }
+    if (page === 'gstReports')      { if(typeof renderGSTReports==='function') renderGSTReports(); }
+    if (page === 'filingHistory')   { if(typeof renderFilingHistory==='function') renderFilingHistory(); }
+    if (page === 'gstSettings')     { if(typeof renderGSTSettings==='function') renderGSTSettings(); }
   }
 
   function init() {
@@ -583,6 +645,30 @@ function renderInvoiceHistory(filter = 'all') {
   if (filter === 'partial')   invoices = invoices.filter(i => i.paymentStatus === 'Partial');
   if (filter === 'cancelled') invoices = invoices.filter(i => i.status === 'cancelled');
 
+  // Date filters
+  const fromDate = document.getElementById('histFilterFromDate')?.value;
+  const toDate = document.getElementById('histFilterToDate')?.value;
+  if (fromDate) invoices = invoices.filter(i => i.date >= fromDate);
+  if (toDate) invoices = invoices.filter(i => i.date <= toDate);
+
+  // Type & Exec filters
+  const invType = document.getElementById('histFilterType')?.value;
+  const exec = document.getElementById('histFilterExec')?.value;
+  if (invType && invType !== 'All Types') {
+    invoices = invoices.filter(i => (i.type || 'Tax Invoice') === invType);
+  }
+  if (exec && exec !== 'All Executives') {
+    invoices = invoices.filter(i => (i.exec || '—') === exec);
+  }
+
+  const histSearch = document.getElementById('histSearchInput');
+  if (histSearch && histSearch.value) {
+    const q = histSearch.value.toLowerCase().trim();
+    if (q) {
+      invoices = invoices.filter(i => JSON.stringify(i).toLowerCase().includes(q));
+    }
+  }
+
   const payMap = { Paid:'badge-success', Pending:'badge-warning', Partial:'badge-warning', Cancelled:'badge-danger' };
 
   tbody.innerHTML = invoices.map(inv => `
@@ -604,6 +690,7 @@ function renderInvoiceHistory(filter = 'all') {
         <div class="d-flex gap-2">
           <button class="btn btn-outline btn-sm" onclick="viewInvoice('${inv.id || inv.number}')">View</button>
           <button class="btn btn-outline btn-sm" onclick="printInvoice('${inv.id || inv.number}')">Print</button>
+          <button class="btn btn-outline btn-sm" onclick="window.openPaymentModal('${inv.id || inv.number}')" ${inv.status === 'cancelled' || inv.paymentStatus === 'Paid' ? 'disabled' : ''} style="color: var(--primary); border-color: var(--primary);">Pay</button>
           <button class="btn btn-outline btn-sm btn-outline-danger" onclick="cancelInvoice('${inv.id || inv.number}')" ${inv.status === 'cancelled' ? 'disabled' : ''}>Cancel</button>
           <button class="btn btn-outline btn-sm" style="color: var(--danger); border-color: var(--danger);" onclick="deleteInvoice('${inv.id || inv.number}')">Delete</button>
         </div>
@@ -656,7 +743,7 @@ window.cancelInvoice = function(invId) {
         }
         
         if (typeof window.saveInvoiceToDB === 'function') {
-            window.saveInvoiceToDB(inv);
+            window.saveInvoiceToDB(inv, true);
         }
 
         AppToast.show('Invoice ' + inv.number + ' has been cancelled', 'warning');
@@ -696,6 +783,169 @@ window.deleteInvoice = function(invId) {
     }
 };
 
+// ── Payment Logic ─────────────────────────────
+window.openPaymentModal = function(invId) {
+    const inv = PH_DATA.invoices.find(i => String(i.id) === String(invId) || String(i.number) === String(invId));
+    if (!inv) {
+        console.error("Invoice not found for ID:", invId);
+        AppToast.show('Invoice not found', 'error');
+        return;
+    }
+    
+    let modal = document.getElementById('paymentModal');
+    if (!modal) {
+        modal = document.createElement('div');
+        modal.id = 'paymentModal';
+        modal.className = 'modal-overlay';
+        modal.style.cssText = 'display:none;align-items:center;justify-content:center;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.5);z-index:999;';
+        modal.innerHTML = `
+          <div class="modal-content card" style="width:400px;max-width:90%;">
+            <div class="card-header d-flex justify-between align-center">
+              <span class="card-title">Record Payment</span>
+              <button class="btn btn-icon" onclick="window.closePaymentModal()"><span class="material-icons-outlined">close</span></button>
+            </div>
+            <div class="card-body">
+              <div id="paymentForm">
+                <input type="hidden" id="pmtInvoiceId">
+                <div class="form-group mb-3">
+                  <label class="form-label">Total Amount</label>
+                  <input type="text" class="form-control" id="pmtTotalDisplay" readonly style="background:#f8fafc;">
+                </div>
+                <div class="form-group mb-3">
+                  <label class="form-label">Balance Due</label>
+                  <input type="text" class="form-control" id="pmtBalanceDisplay" readonly style="background:#f8fafc; color: var(--danger); font-weight: bold;">
+                </div>
+                <div class="form-group mb-3">
+                  <label class="form-label">Amount Paid <span style="color:red">*</span></label>
+                  <input type="number" class="form-control" id="pmtAmount" required step="0.01">
+                </div>
+                <div class="form-group mb-3">
+                  <label class="form-label">Payment Date <span style="color:red">*</span></label>
+                  <input type="date" class="form-control" id="pmtDate" required>
+                </div>
+                <div class="form-group mb-3">
+                  <label class="form-label">Payment Mode <span style="color:red">*</span></label>
+                  <select class="form-control" id="pmtMode">
+                    <option value="Cash">Cash</option>
+                    <option value="UPI">UPI</option>
+                    <option value="Card">Card</option>
+                    <option value="Bank Transfer">Bank Transfer</option>
+                  </select>
+                </div>
+                <div class="form-group mb-4">
+                  <label class="form-label">Reference / Notes</label>
+                  <input type="text" class="form-control" id="pmtNotes" placeholder="Transaction ID, Cheque No, etc.">
+                </div>
+                <div class="d-flex justify-end gap-2">
+                  <button type="button" class="btn btn-outline" onclick="window.closePaymentModal()">Cancel</button>
+                  <button type="button" class="btn btn-primary" onclick="window.submitPayment()">Save Payment</button>
+                </div>
+              </div>
+            </div>
+          </div>
+        `;
+        document.body.appendChild(modal);
+    }
+    
+    document.getElementById('pmtInvoiceId').value = inv.id || inv.number;
+    document.getElementById('pmtTotalDisplay').value = PH_DATA.formatNum(inv.grandTotal);
+    
+    const balanceDue = (inv.grandTotal || 0) - (inv.amtReceived || 0);
+    document.getElementById('pmtBalanceDisplay').value = PH_DATA.formatNum(balanceDue);
+    
+    // Default amount to full balance
+    document.getElementById('pmtAmount').value = balanceDue.toFixed(2);
+    
+    // Default date to today
+    const today = new Date().toISOString().split('T')[0];
+    document.getElementById('pmtDate').value = today;
+    
+    document.getElementById('pmtMode').value = 'Cash';
+    document.getElementById('pmtNotes').value = '';
+    
+    const modalEl = document.getElementById('paymentModal');
+    modalEl.style.display = 'flex';
+    // The CSS for .modal-overlay uses opacity:0 unless .is-open is added!
+    setTimeout(() => modalEl.classList.add('is-open'), 10);
+};
+
+window.closePaymentModal = function() {
+    const modalEl = document.getElementById('paymentModal');
+    if (modalEl) {
+        modalEl.classList.remove('is-open');
+        setTimeout(() => modalEl.style.display = 'none', 200);
+    }
+};
+
+window.submitPayment = function() {
+    const invId = document.getElementById('pmtInvoiceId').value;
+    const inv = PH_DATA.invoices.find(i => String(i.id) === String(invId) || String(i.number) === String(invId));
+    if (!inv) {
+        AppToast.show('Invoice not found', 'error');
+        return;
+    }
+    
+    const amountStr = document.getElementById('pmtAmount').value;
+    const amount = parseFloat(amountStr);
+    
+    if (isNaN(amount) || amount <= 0) {
+        AppToast.show('Please enter a valid amount', 'error');
+        return;
+    }
+    
+    const balanceDue = (inv.grandTotal || 0) - (inv.amtReceived || 0);
+    if (amount > balanceDue + 0.05) {
+        AppToast.show('Amount cannot exceed balance due', 'error');
+        return;
+    }
+    
+    // Update invoice amount received
+    inv.amtReceived = (inv.amtReceived || 0) + amount;
+    const newBalance = (inv.grandTotal || 0) - inv.amtReceived;
+    
+    if (newBalance <= 0.05) {
+        inv.paymentStatus = 'Paid';
+        inv.amtReceived = inv.grandTotal; // Normalize
+    } else {
+        inv.paymentStatus = 'Partial';
+    }
+    
+    // We update the local ledger if customer is attached
+    if (inv.customerId) {
+        const cust = PH_DATA.customers.find(c => c.id === inv.customerId);
+        if (cust) {
+            cust.outstanding = (cust.outstanding || 0) - amount;
+            if (typeof window.saveCustomerToDB === 'function') {
+                window.saveCustomerToDB(cust);
+            }
+        }
+    }
+    
+    // Save invoice
+    if (typeof window.saveInvoiceToDB === 'function') {
+        window.saveInvoiceToDB(inv, true);
+    }
+    
+    // Also update the individual invoice item so the Print/Preview page sees the payment
+    try {
+        const singleInvStr = localStorage.getItem('padowa_invoice_' + inv.number);
+        if (singleInvStr) {
+            const singleInv = JSON.parse(singleInvStr);
+            singleInv.amtReceived = inv.amtReceived;
+            singleInv.paymentStatus = inv.paymentStatus;
+            localStorage.setItem('padowa_invoice_' + inv.number, JSON.stringify(singleInv));
+        }
+    } catch(e) {}
+    
+    AppToast.show(`Payment of ${PH_DATA.formatNum(amount)} recorded successfully`, 'success');
+    window.closePaymentModal();
+    
+    // Refresh UI
+    renderInvoiceHistory();
+    if(typeof renderDashRecentInvoices === 'function') renderDashRecentInvoices();
+    if(typeof renderDashboard === 'function') renderDashboard();
+};
+
 // ── Drafts ────────────────────────────────────
 function renderDrafts() {
   const tbody = document.getElementById('draftsTbody');
@@ -705,22 +955,52 @@ function renderDrafts() {
     <tr>
       <td class="mono">${d.number}</td>
       <td>${d.date}</td>
-      <td>${d.customer}</td>
+      <td>${d.custName}</td>
       <td>${d.items}</td>
       <td><span class="badge badge-warning">Draft</span></td>
-      <td style="color:var(--text-muted)">${d.lastSaved}</td>
+      <td style="color:var(--text-muted)">${new Date(d.lastSaved).toLocaleString()}</td>
       <td>
         <div class="d-flex gap-2">
-          <button class="btn btn-primary btn-sm" onclick="App.navigate('newInvoice');AppToast.show('Draft loaded','info')">
+          <button class="btn btn-primary btn-sm" onclick="resumeDraft('${d.id}')">
             <span class="material-icons-outlined">edit</span> Continue
           </button>
-          <button class="btn btn-outline-danger btn-sm" onclick="AppToast.show('Draft deleted','error')">
+          <button class="btn btn-outline-danger btn-sm" onclick="deleteDraft('${d.id}')">
             <span class="material-icons-outlined">delete</span>
           </button>
         </div>
       </td>
     </tr>`).join('');
 }
+
+window.resumeDraft = function(draftId) {
+    const draft = PH_DATA.drafts.find(d => d.id === draftId);
+    if (!draft || !draft.rawState) return;
+    
+    try {
+        const parsedState = JSON.parse(draft.rawState);
+        if (typeof InvoiceModule !== 'undefined' && typeof InvoiceModule.resumeState === 'function') {
+            InvoiceModule.resumeState(parsedState);
+            PH_DATA.drafts = PH_DATA.drafts.filter(d => d.id !== draftId); // Remove from drafts once resumed
+            if (typeof window.saveDraftsToDB === 'function') window.saveDraftsToDB(PH_DATA.drafts);
+            App.navigate('newInvoice');
+            AppToast.show('Draft loaded successfully', 'success');
+        } else {
+            console.error('InvoiceModule or resumeState not found');
+        }
+    } catch(e) {
+        console.error('Failed to parse draft state', e);
+        AppToast.show('Error loading draft', 'error');
+    }
+};
+
+window.deleteDraft = function(draftId) {
+    if (confirm('Are you sure you want to delete this draft?')) {
+        PH_DATA.drafts = PH_DATA.drafts.filter(d => d.id !== draftId);
+        if (typeof window.saveDraftsToDB === 'function') window.saveDraftsToDB(PH_DATA.drafts);
+        renderDrafts();
+        AppToast.show('Draft deleted', 'info');
+    }
+};
 
 // ── Cancelled ─────────────────────────────────
 function renderCancelled() {
@@ -752,24 +1032,41 @@ function renderPrintQueue() {
   const pending = PH_DATA.invoices.filter(i => i.status !== 'cancelled').slice(0, 5);
   tbody.innerHTML = pending.map(inv => `
     <tr>
-      <td><input type="checkbox" class="row-checkbox" checked></td>
+      <td><input type="checkbox" class="row-checkbox" data-invid="${inv.id || inv.number}" checked></td>
       <td class="mono">${inv.number}</td>
       <td>${inv.custName}</td>
       <td>${inv.date}</td>
       <td class="amount total">${PH_DATA.formatNum(inv.grandTotal)}</td>
       <td>
-        <button class="btn btn-primary btn-sm" onclick="AppToast.show('Printing ${inv.number}...','info')">
+        <button class="btn btn-primary btn-sm" onclick="printInvoice('${inv.id || inv.number}')">
           <span class="material-icons-outlined">print</span> Print
         </button>
       </td>
     </tr>`).join('');
 }
 
+window.printSelectedQueue = function() {
+    const checkboxes = document.querySelectorAll('#printQueueTbody .row-checkbox:checked');
+    if (checkboxes.length === 0) {
+        AppToast.show('Please select at least one invoice to print', 'warning');
+        return;
+    }
+    checkboxes.forEach(cb => {
+        const invId = cb.dataset.invid;
+        if (invId) setTimeout(() => printInvoice(invId), 500); // slight delay for multiple windows
+    });
+};
+
 // ── Reports ───────────────────────────────────
 const Reports = {
   init() {
     this.renderSummaryCards();
     this.renderDailyReport();
+    this.renderGstReport();
+    this.renderTopCustomers();
+    this.renderPending();
+    this.renderMR();
+    this.renderMonthly();
   },
 
   renderSummaryCards() {
@@ -848,6 +1145,55 @@ const Reports = {
           <td class="amount total">${PH_DATA.formatNum(d.total)}</td>
         </tr>`).join('');
   },
+
+  renderPending() {
+    const tbody = document.getElementById('repPendingTbody');
+    if (!tbody) return;
+    const pendingCusts = PH_DATA.customers.filter(c => (c.outstanding || 0) > 0).sort((a,b) => b.outstanding - a.outstanding);
+    tbody.innerHTML = pendingCusts.length > 0 ? pendingCusts.map(c => `
+      <tr>
+        <td>${c.name}</td>
+        <td class="amount">${PH_DATA.formatNum(c.outstanding)}</td>
+      </tr>`).join('') : '<tr><td colspan="2" class="text-center text-muted">No pending payments found</td></tr>';
+  },
+
+  renderMR() {
+    const tbody = document.getElementById('repMRTbody');
+    if (!tbody) return;
+    const mrStats = {};
+    PH_DATA.invoices.filter(i => i.status !== 'cancelled' && i.executive).forEach(inv => {
+      mrStats[inv.executive] = mrStats[inv.executive] || { count: 0, sales: 0 };
+      mrStats[inv.executive].count++;
+      mrStats[inv.executive].sales += inv.grandTotal;
+    });
+    const mrArr = Object.keys(mrStats).map(mr => ({ name: mr, ...mrStats[mr] })).sort((a,b) => b.sales - a.sales);
+    tbody.innerHTML = mrArr.length > 0 ? mrArr.map(mr => `
+      <tr>
+        <td>${mr.name}</td>
+        <td style="text-align:center">${mr.count}</td>
+        <td class="amount">${PH_DATA.formatNum(mr.sales)}</td>
+      </tr>`).join('') : '<tr><td colspan="3" class="text-center text-muted">No MR data found</td></tr>';
+  },
+
+  renderMonthly() {
+    const tbody = document.getElementById('repMonthlyTbody');
+    if (!tbody) return;
+    const mStats = {};
+    PH_DATA.invoices.filter(i => i.status !== 'cancelled').forEach(inv => {
+      if(!inv.date) return;
+      const mKey = inv.date.substring(0, 7); // YYYY-MM
+      mStats[mKey] = mStats[mKey] || { count: 0, sales: 0 };
+      mStats[mKey].count++;
+      mStats[mKey].sales += inv.grandTotal;
+    });
+    const mArr = Object.keys(mStats).map(m => ({ month: m, ...mStats[m] })).sort((a,b) => a.month < b.month ? 1 : -1);
+    tbody.innerHTML = mArr.length > 0 ? mArr.map(m => `
+      <tr>
+        <td>${m.month}</td>
+        <td style="text-align:center">${m.count}</td>
+        <td class="amount">${PH_DATA.formatNum(m.sales)}</td>
+      </tr>`).join('') : '<tr><td colspan="3" class="text-center text-muted">No monthly data found</td></tr>';
+  }
 };
 
 // ── AUTHENTICATION ─────────────────────────────
@@ -972,6 +1318,9 @@ document.addEventListener('DOMContentLoaded', async () => {
       if (btn.dataset.repTab === 'daily')     Reports.renderDailyReport();
       if (btn.dataset.repTab === 'gst')       Reports.renderGstReport();
       if (btn.dataset.repTab === 'customers') Reports.renderTopCustomers();
+      if (btn.dataset.repTab === 'pending')   { if(Reports.renderPending) Reports.renderPending(); }
+      if (btn.dataset.repTab === 'mr')        { if(Reports.renderMR) Reports.renderMR(); }
+      if (btn.dataset.repTab === 'monthly')   { if(Reports.renderMonthly) Reports.renderMonthly(); }
     });
   });
 
@@ -979,12 +1328,44 @@ document.addEventListener('DOMContentLoaded', async () => {
   const histSearch = document.getElementById('histSearchInput');
   if (histSearch) {
     histSearch.addEventListener('input', () => {
-      const q = histSearch.value.toLowerCase();
-      document.querySelectorAll('#historyTbody tr').forEach(tr => {
-        tr.style.display = tr.textContent.toLowerCase().includes(q) ? '' : 'none';
-      });
+      const activeTabBtn = document.querySelector('[data-hist-tab].is-active');
+      const currentFilter = activeTabBtn ? activeTabBtn.dataset.histTab : 'all';
+      renderInvoiceHistory(currentFilter);
     });
+    
+    // Also attach to the search button next to it if clicked
+    const searchBtn = histSearch.nextElementSibling;
+    if (searchBtn && searchBtn.tagName === 'BUTTON') {
+      searchBtn.addEventListener('click', () => {
+        const activeTabBtn = document.querySelector('[data-hist-tab].is-active');
+        const currentFilter = activeTabBtn ? activeTabBtn.dataset.histTab : 'all';
+        renderInvoiceHistory(currentFilter);
+      });
+    }
   }
+
+  // Bind change events to all history filters
+  const histFilters = ['histFilterFromDate', 'histFilterToDate', 'histFilterType', 'histFilterExec'];
+  histFilters.forEach(id => {
+    const el = document.getElementById(id);
+    if (el) {
+      el.addEventListener('change', () => {
+        const activeTabBtn = document.querySelector('[data-hist-tab].is-active');
+        const currentFilter = activeTabBtn ? activeTabBtn.dataset.histTab : 'all';
+        renderInvoiceHistory(currentFilter);
+      });
+    }
+  });
+
+// GST Reports tab switcher
+window.switchGstReportTab = function(tab) {
+  document.querySelectorAll('[id^="gstRepTab-"]').forEach(btn => btn.classList.remove('is-active'));
+  document.querySelectorAll('[id^="gstRep-"]').forEach(pane => pane.classList.remove('is-active'));
+  const btn = document.getElementById('gstRepTab-' + tab);
+  const pane = document.getElementById('gstRep-' + tab);
+  if (btn) btn.classList.add('is-active');
+  if (pane) pane.classList.add('is-active');
+};
 
 // Print button in toolbar
   document.getElementById('doPrint')?.addEventListener('click', () => window.print());
@@ -1050,12 +1431,13 @@ window.autoSaveSettings = function() {
     const authPass = document.getElementById('settingAuthPass')?.value || 'admin';
     const adminName = document.getElementById('settingAdminName')?.value || 'Dr. PRASANTH KINJINGI';
     const creditDays = document.getElementById('settingCreditDays')?.value || '30';
+    const salesExecutivesStr = document.getElementById('settingSalesExecutives')?.value || '';
 
     const settings = {
         compName, branchName, compPhone, compGSTIN, compDL, compEmail, compWebsite,
         bankName, bankBranch, accNo, ifsc, address, terms, upi, state, defaultGST,
         printPaperSize, printCopies, printWatermark, printLogo,
-        authUser, authPass, adminName, creditDays
+        authUser, authPass, adminName, creditDays, salesExecutivesStr
     };
     
     if (window.currentUpiQrBase64) {
@@ -1095,10 +1477,25 @@ window.autoSaveSettings = function() {
         }
     }
     
-    if (window.InvoiceModule) {
+    if (typeof InvoiceModule !== 'undefined') {
         InvoiceModule.populateStep6Settings();
         if (typeof InvoiceModule.updateSummaryPanel === 'function') {
             InvoiceModule.updateSummaryPanel();
+        }
+    }
+    
+    // Update PH_DATA.executives
+    if (salesExecutivesStr.trim()) {
+        const execs = salesExecutivesStr.split(',').map(s => s.trim()).filter(s => s);
+        PH_DATA.executives = execs.map((e, idx) => {
+            const match = e.match(/^(.*?)\s*\((.*?)\)$/);
+            if (match) {
+                return { id: 'MR' + String(idx + 1).padStart(3, '0'), name: match[1].trim(), region: match[2].trim() };
+            }
+            return { id: 'MR' + String(idx + 1).padStart(3, '0'), name: e, region: 'General' };
+        });
+        if (typeof InvoiceModule !== 'undefined' && typeof InvoiceModule.populateExecutives === 'function') {
+            InvoiceModule.populateExecutives(); // Re-render dropdown
         }
     }
 
@@ -1138,7 +1535,7 @@ document.addEventListener('DOMContentLoaded', () => {
         'settingBankName', 'settingBankBranch', 'settingAccount', 'settingIFSC', 'settingAddress', 'settingUPI', 'settingState',
         'settingInvPrefix', 'settingInvSeq', 'invTerms', 'settingTerms',
         'settingDefaultGST', 'settingPrintPaperSize', 'settingPrintCopies', 'settingPrintWatermark', 'settingPrintLogo',
-        'settingAuthUser', 'settingAuthPass', 'settingAdminName', 'settingCreditDays'
+        'settingAuthUser', 'settingAuthPass', 'settingAdminName', 'settingCreditDays', 'settingSalesExecutives'
     ];
     settingIds.forEach(id => {
         const el = document.getElementById(id);
@@ -1207,6 +1604,17 @@ window.loadSettings = async function() {
             const setDefaultGST = document.getElementById('settingDefaultGST');
             if (setDefaultGST && settings.defaultGST) setDefaultGST.value = settings.defaultGST;
             
+            if (settings.salesExecutivesStr !== undefined) {
+                const el = document.getElementById('settingSalesExecutives');
+                if (el) el.value = settings.salesExecutivesStr;
+            } else {
+                // If not in settings yet, construct from PH_DATA
+                const el = document.getElementById('settingSalesExecutives');
+                if (el && PH_DATA.executives.length > 0) {
+                    el.value = PH_DATA.executives.map(e => `${e.name} (${e.region})`).join(', ');
+                }
+            }
+
             const setPrintPaperSize = document.getElementById('settingPrintPaperSize');
             if (setPrintPaperSize && settings.printPaperSize) setPrintPaperSize.value = settings.printPaperSize;
             const setPrintCopies = document.getElementById('settingPrintCopies');
@@ -1453,8 +1861,8 @@ window.updateCustomer = function() {
   window.renderCustomersLedger();
   
   // If editing currently selected customer in new invoice, update the card
-  if (typeof InvoiceModule !== 'undefined' && window.InvoiceModule) {
-      const invState = window.InvoiceModule.getState(); // assuming we can access or just trigger update
+  if (typeof InvoiceModule !== 'undefined') {
+      const invState = InvoiceModule.getState(); // assuming we can access or just trigger update
       if (invState && invState.customer && invState.customer.code === c.code) {
           InvoiceModule.selectCustomerById(c.code);
       }
