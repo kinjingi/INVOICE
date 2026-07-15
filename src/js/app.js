@@ -1929,3 +1929,25 @@ document.addEventListener('DOMContentLoaded', () => {
     // Initial calculation
     calculatePharmaPrice();
 });
+
+
+// --- Vite Global Expose ---
+if (typeof window !== "undefined") {
+  window.AppToast = AppToast;
+  window.openCustomerAddModal = openCustomerAddModal;
+  window.syncStateCode = syncStateCode;
+  window.resetCustomerAddForm = resetCustomerAddForm;
+  window.saveNewCustomer = saveNewCustomer;
+  window.App = App;
+  window.renderDashboard = renderDashboard;
+  window.renderDashPaymentStatus = renderDashPaymentStatus;
+  window.renderActivityFeed = renderActivityFeed;
+  window.renderDashMiniChart = renderDashMiniChart;
+  window.renderDashRecentInvoices = renderDashRecentInvoices;
+  window.renderInvoiceHistory = renderInvoiceHistory;
+  window.renderDrafts = renderDrafts;
+  window.renderCancelled = renderCancelled;
+  window.renderPrintQueue = renderPrintQueue;
+  window.Reports = Reports;
+  window.checkAuth = checkAuth;
+}

@@ -509,3 +509,17 @@ function mockFetchInvoiceData(id) {
         products: []
     };
 }
+
+
+// --- Vite Global Expose ---
+if (typeof window !== "undefined") {
+  window.applyPrintPreferences = applyPrintPreferences;
+  window.renderHeader = renderHeader;
+  window.renderCustomer = renderCustomer;
+  window.applyRetailerTemplate = applyRetailerTemplate;
+  window.renderProducts = renderProducts;
+  window.renderGstSummary = renderGstSummary;
+  window.renderBillSummary = renderBillSummary;
+  window.numberToWords = numberToWords;
+  window.mockFetchInvoiceData = mockFetchInvoiceData;
+}

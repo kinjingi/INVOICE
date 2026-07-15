@@ -1961,3 +1961,9 @@ const InvoiceModule = (() => {
   };
 
 })();
+
+
+// --- Vite Global Expose ---
+if (typeof window !== "undefined") {
+  window.InvoiceModule = InvoiceModule;
+}
