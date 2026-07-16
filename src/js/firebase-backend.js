@@ -1,18 +1,5 @@
-import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
-import { getFirestore, collection, getDocs, doc, setDoc, deleteDoc, getDoc } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
-
-const firebaseConfig = {
-  apiKey: "AIzaSyB8IfJRDxH6doI7FUz5HuxryXeL2WSem3Y",
-  authDomain: "padowa-healthcare-invoice.firebaseapp.com",
-  projectId: "padowa-healthcare-invoice",
-  storageBucket: "padowa-healthcare-invoice.firebasestorage.app",
-  messagingSenderId: "606715360476",
-  appId: "1:606715360476:web:55961b7a5ae2a73a20f019",
-  measurementId: "G-WP1HZC64MJ"
-};
-
-const app = initializeApp(firebaseConfig);
-const db = getFirestore(app);
+import { collection, getDocs, doc, setDoc, deleteDoc, getDoc } from 'firebase/firestore';
+import { db } from '../firebase/firestore.js';
 
 window.initFirebaseDB = async function() {
     try {
@@ -59,6 +46,12 @@ window.saveCustomerToDB = async function(customer) {
     } catch(e) { console.error("Error saving customer", e); }
 };
 
+window.deleteCustomerFromDB = async function(id) {
+    try {
+        await deleteDoc(doc(db, "customers", id));
+    } catch(e) { console.error("Error deleting customer", e); }
+};
+
 window.saveProductToDB = async function(product) {
     const id = product.code;
     try {
@@ -72,9 +65,14 @@ window.deleteProductFromDB = async function(code) {
     } catch(e) { console.error("Error deleting product", e); }
 };
 
-window.saveInvoiceToDB = async function(invoice) {
+window.saveInvoiceToDB = async function(invoice, isUpdate = false) {
     try {
         await setDoc(doc(db, "invoices", invoice.id), invoice);
+        
+        if (!isUpdate) {
+            window.PH_DATA.nextInvoiceSeq++;
+            await setDoc(doc(db, "metadata", "invoice_seq"), { value: window.PH_DATA.nextInvoiceSeq });
+        }
     } catch(e) { console.error("Error saving invoice", e); }
 };
 

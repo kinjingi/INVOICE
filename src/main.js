@@ -5,7 +5,7 @@ import './firebase/auth.js';
 import './firebase/storage.js';
 
 import './js/data.js';
-import './js/local-backend.js';
+import './js/firebase-backend.js';
 import './js/invoice.js';
 import './js/app.js';
 

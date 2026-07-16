@@ -14,6 +14,7 @@ export default defineConfig({
         main: resolve(__dirname, 'index.html'),
         preview: resolve(__dirname, 'preview.html')
       }
-    }
+    },
+    sourcemap: true
   }
 });
