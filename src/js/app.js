@@ -364,8 +364,7 @@ const App = (() => {
 
   const pages = [
     'dashboard', 'newInvoice', 'invoiceHistory',
-    'drafts', 'cancelled', 'printQueue', 'reports', 'settings', 'customers', 'products',
-    'gstDashboard', 'gstr1', 'gstr3b', 'gstReports', 'filingHistory', 'gstSettings'
+    'drafts', 'cancelled', 'printQueue', 'reports', 'settings', 'customers', 'products'
   ];
 
   let currentPage = 'dashboard';
@@ -406,13 +405,7 @@ const App = (() => {
     if (page === 'printQueue')      renderPrintQueue();
     if (page === 'customers')       renderCustomersLedger();
     if (page === 'products')        renderProductsMaster();
-    // GST Module pages
-    if (page === 'gstDashboard')    { if(typeof renderGSTDashboard==='function') renderGSTDashboard(); }
-    if (page === 'gstr1')           { if(typeof renderGSTR1==='function') renderGSTR1(); }
-    if (page === 'gstr3b')          { if(typeof renderGSTR3B==='function') renderGSTR3B(); }
-    if (page === 'gstReports')      { if(typeof renderGSTReports==='function') renderGSTReports(); }
-    if (page === 'filingHistory')   { if(typeof renderFilingHistory==='function') renderFilingHistory(); }
-    if (page === 'gstSettings')     { if(typeof renderGSTSettings==='function') renderGSTSettings(); }
+
   }
 
   function init() {
@@ -1294,6 +1287,8 @@ document.addEventListener('keydown', (e) => {
 
 // ── DOMContentLoaded ──────────────────────────
 document.addEventListener('DOMContentLoaded', async () => {
+  App.init();
+
   let waited = 0;
   while (typeof window.initFirebaseDB !== 'function' && waited < 5000) {
       await new Promise(r => setTimeout(r, 100));
@@ -1302,8 +1297,6 @@ document.addEventListener('DOMContentLoaded', async () => {
   if (typeof window.initFirebaseDB === 'function') {
       try { await window.initFirebaseDB(); } catch(e) { console.warn("Init DB failed", e); }
   }
-
-  App.init();
 
   // Tab system for Invoice History
   document.querySelectorAll('[data-hist-tab]').forEach(btn => {

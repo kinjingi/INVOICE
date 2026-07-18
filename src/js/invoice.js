@@ -1890,7 +1890,7 @@ const InvoiceModule = (() => {
     } else {
       dot.className = 'autosave-dot';
       const t = state.lastSaved;
-      text.textContent = t ? 'Saved ' + t.toLocaleTimeString('en-IN', {hour:'2-digit',minute:'2-digit'}) : 'Auto-saved';
+      text.textContent = t ? 'Saved ' + new Date(t).toLocaleTimeString('en-IN', {hour:'2-digit',minute:'2-digit'}) : 'Auto-saved';
     }
   }
 
