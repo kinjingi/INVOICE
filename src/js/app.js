@@ -764,9 +764,9 @@ window.deleteInvoice = function(invId) {
 
         PH_DATA.invoices = PH_DATA.invoices.filter(i => i.id !== inv.id);
         
-        // save invoices
-        if (typeof window.saveInvoiceToDB === 'function') {
-            localStorage.setItem('ph_invoices', JSON.stringify(PH_DATA.invoices));
+        // delete from Firebase
+        if (typeof window.deleteInvoiceFromDB === 'function') {
+            window.deleteInvoiceFromDB(inv.id);
         }
 
         AppToast.show('Invoice ' + inv.number + ' deleted successfully', 'error');
