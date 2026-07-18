@@ -718,15 +718,20 @@ const InvoiceModule = (() => {
     if (e.key === 'Tab' || e.key === 'Enter') {
       e.preventDefault();
       if (idx < allInputs.length - 1) {
-        allInputs[idx + 1].focus();
-        allInputs[idx + 1].select();
+        const next = allInputs[idx + 1];
+        next.focus();
+        if (typeof next.select === 'function') next.select();
       } else {
         // Last cell — go to next row
         const allRows = Array.from(document.querySelectorAll('#productTbody tr'));
         const rowIdx  = allRows.indexOf(tr);
         if (rowIdx < allRows.length - 1) {
           const nextInputs = allRows[rowIdx + 1].querySelectorAll('.grid-input:not([readonly])');
-          if (nextInputs.length) { nextInputs[0].focus(); nextInputs[0].select(); }
+          if (nextInputs.length) { 
+             const n = nextInputs[0];
+             n.focus(); 
+             if (typeof n.select === 'function') n.select(); 
+          }
         } else {
           addRow();
           setTimeout(() => {
@@ -1949,6 +1954,7 @@ const InvoiceModule = (() => {
     moveRowUp, moveRowDown,
     updateSummaryPanel, buildPrintPreview, printInvoice, populateStep6Settings,
     resumeState,
+    getState() { return state; },
     // Called by customer add modal to auto-select the new customer
     selectCustomerById(id) {
       const cust = PH_DATA.getCustomerById(id);
