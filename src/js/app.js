@@ -1746,7 +1746,11 @@ window.renderCustomersLedger = function() {
 
 window.deleteCustomer = function(code) {
   if (confirm('Are you sure you want to delete customer ' + code + '? This action cannot be undone.')) {
-      PH_DATA.customers = PH_DATA.customers.filter(c => c.code !== code);
+      const c = PH_DATA.customers.find(x => x.code === code);
+      PH_DATA.customers = PH_DATA.customers.filter(x => x.code !== code);
+      if (c && typeof window.deleteCustomerFromDB === 'function') {
+          window.deleteCustomerFromDB(c.id);
+      }
       AppToast.show('Customer ' + code + ' deleted.', 'info');
       window.renderCustomersLedger();
   }

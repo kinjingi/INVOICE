@@ -21,30 +21,35 @@ window.initFirebaseDB = async function() {
 
         // Auto-migrate from localStorage if Firebase is completely empty
         if (window.PH_DATA.customers.length === 0 && window.PH_DATA.products.length === 0 && window.PH_DATA.invoices.length === 0) {
-            try {
-                const localCust = JSON.parse(localStorage.getItem('ph_customers') || '[]');
-                const localProd = JSON.parse(localStorage.getItem('ph_products') || '[]');
-                const localInv = JSON.parse(localStorage.getItem('ph_invoices') || '[]');
-                
-                if (localCust.length > 0 || localProd.length > 0 || localInv.length > 0) {
-                    console.log("Migrating local data to Firebase...");
-                    window.PH_DATA.customers = localCust;
-                    window.PH_DATA.products = localProd;
-                    window.PH_DATA.invoices = localInv;
+            if (!localStorage.getItem('ph_firebase_migrated')) {
+                try {
+                    const localCust = JSON.parse(localStorage.getItem('ph_customers') || '[]');
+                    const localProd = JSON.parse(localStorage.getItem('ph_products') || '[]');
+                    const localInv = JSON.parse(localStorage.getItem('ph_invoices') || '[]');
                     
-                    for (const c of localCust) await setDoc(doc(db, "customers", c.id || ('CUST'+Date.now())), c);
-                    for (const p of localProd) await setDoc(doc(db, "products", p.code), p);
-                    for (const i of localInv) await setDoc(doc(db, "invoices", i.id), i);
-                    
-                    const localSeq = localStorage.getItem('padowa_next_invoice_seq');
-                    if (localSeq) {
-                        window.PH_DATA.nextInvoiceSeq = parseInt(localSeq, 10);
-                        await setDoc(doc(db, "metadata", "invoice_seq"), { value: window.PH_DATA.nextInvoiceSeq });
+                    if (localCust.length > 0 || localProd.length > 0 || localInv.length > 0) {
+                        console.log("Migrating local data to Firebase...");
+                        window.PH_DATA.customers = localCust;
+                        window.PH_DATA.products = localProd;
+                        window.PH_DATA.invoices = localInv;
+                        
+                        for (const c of localCust) await setDoc(doc(db, "customers", c.id || ('CUST'+Date.now())), c);
+                        for (const p of localProd) await setDoc(doc(db, "products", p.code), p);
+                        for (const i of localInv) await setDoc(doc(db, "invoices", i.id), i);
+                        
+                        const localSeq = localStorage.getItem('padowa_next_invoice_seq');
+                        if (localSeq) {
+                            window.PH_DATA.nextInvoiceSeq = parseInt(localSeq, 10);
+                            await setDoc(doc(db, "metadata", "invoice_seq"), { value: window.PH_DATA.nextInvoiceSeq });
+                        }
+                        console.log("Migration complete!");
                     }
-                    console.log("Migration complete!");
+                } catch(migErr) {
+                    console.error("Migration failed:", migErr);
+                } finally {
+                    // Mark as migrated regardless of success/fail so it never resurrects data
+                    localStorage.setItem('ph_firebase_migrated', 'true');
                 }
-            } catch(migErr) {
-                console.error("Migration failed:", migErr);
             }
         }
 
