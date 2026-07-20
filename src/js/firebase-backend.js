@@ -10,9 +10,9 @@ window.initFirebaseDB = async function() {
             getDocs(collection(db, "metadata"))
         ]);
 
-        window.PH_DATA.customers = custSnap.docs.map(d => d.data());
-        window.PH_DATA.products = prodSnap.docs.map(d => d.data());
-        window.PH_DATA.invoices = invSnap.docs.map(d => d.data()).sort((a,b) => b.number.localeCompare(a.number));
+        window.PH_DATA.customers = custSnap.docs.map(d => ({ ...d.data(), id: d.id }));
+        window.PH_DATA.products = prodSnap.docs.map(d => ({ ...d.data(), id: d.id }));
+        window.PH_DATA.invoices = invSnap.docs.map(d => ({ ...d.data(), id: d.id })).sort((a,b) => b.number.localeCompare(a.number));
         
         const seqDoc = seqSnap.docs.find(d => d.id === 'invoice_seq');
         if (seqDoc) {
