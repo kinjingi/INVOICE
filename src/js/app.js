@@ -1404,6 +1404,7 @@ window.switchGstReportTab = function(tab) {
 });
 
 window.autoSaveSettings = function() {
+    if (!window._settingsLoaded) return;
     const compName = document.getElementById('settingCompName')?.value || 'PADOWA Healthcare';
     const branchName = document.getElementById('settingBranchName')?.value || 'Ethical Pharmaceutical Marketing';
     const compPhone = document.getElementById('settingCompPhone')?.value || '+91 80 4123 5678';
@@ -1527,6 +1528,7 @@ window.autoSaveSettings = function() {
 };
 
 window.saveSettings = function() {
+    window._settingsLoaded = true;
     window.autoSaveSettings();
     AppToast.show('Settings saved successfully', 'success');
 };
@@ -1664,6 +1666,7 @@ window.loadSettings = async function() {
                 }
             }
         }
+        window._settingsLoaded = true;
     } catch(e) {}
 };
 
