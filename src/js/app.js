@@ -414,31 +414,66 @@ const App = (() => {
       el.addEventListener('click', () => navigate(el.dataset.page));
     });
 
-    // Header search
+    // Header search — live dropdown
     const hs = document.getElementById('headerSearch');
-    if (hs) hs.addEventListener('keydown', e => {
-      if (e.key === 'Enter') { 
-        const val = hs.value.trim().toLowerCase();
-        if (!val) return;
-        
-        const custMatches = PH_DATA.customers.filter(c => 
-          c.name.toLowerCase().includes(val) || 
-          c.code.toLowerCase().includes(val) || 
-          (c.phone && c.phone.includes(val)) || 
-          (c.gstin && c.gstin.toLowerCase().includes(val))
-        );
-        
-        if (custMatches.length > 0) {
-            const csInput = document.getElementById('customersSearchInput');
-            if (csInput) csInput.value = hs.value;
-            navigate('customers');
-            AppToast.show('Found in Customers Ledger', 'success');
-        } else {
-            navigate('invoiceHistory'); 
-            AppToast.show('Searching Invoices: ' + hs.value, 'info'); 
-        }
+    if (hs) {
+      // Create dropdown panel
+      let searchPanel = document.getElementById('headerSearchPanel');
+      if (!searchPanel) {
+        searchPanel = document.createElement('div');
+        searchPanel.id = 'headerSearchPanel';
+        searchPanel.style.cssText = 'position:absolute;top:calc(100% + 6px);left:0;right:0;background:var(--card);border:1px solid var(--border-color);border-radius:var(--radius-md);box-shadow:0 8px 24px rgba(0,0,0,0.12);z-index:9999;max-height:360px;overflow-y:auto;display:none;';
+        hs.parentElement.style.position = 'relative';
+        hs.parentElement.appendChild(searchPanel);
       }
-    });
+
+      hs.addEventListener('input', () => {
+        const val = hs.value.trim().toLowerCase();
+        if (!val || val.length < 2) { searchPanel.style.display = 'none'; return; }
+
+        const custMatches = PH_DATA.customers.filter(c =>
+          c.name.toLowerCase().includes(val) ||
+          (c.code && c.code.toLowerCase().includes(val)) ||
+          (c.phone && c.phone.includes(val))
+        ).slice(0, 5);
+
+        const invMatches = PH_DATA.invoices.filter(i =>
+          (i.number && i.number.toLowerCase().includes(val)) ||
+          (i.custName && i.custName.toLowerCase().includes(val))
+        ).slice(0, 5);
+
+        let html = '';
+        if (custMatches.length > 0) {
+          html += `<div style="padding:8px 12px;font-size:11px;font-weight:700;color:var(--text-muted);text-transform:uppercase;border-bottom:1px solid var(--border-color);">Customers</div>`;
+          html += custMatches.map(c => `
+            <div class="search-result-item" onclick="App.navigate('customers'); document.getElementById('customersSearchInput').value='${c.name}'; window.renderCustomersLedger(); document.getElementById('headerSearchPanel').style.display='none'; document.getElementById('headerSearch').value='';" style="padding:10px 12px;cursor:pointer;display:flex;align-items:center;gap:8px;border-bottom:1px solid var(--border-color);" onmouseover="this.style.background='var(--bg)'" onmouseout="this.style.background='';">
+              <span class="material-icons-outlined" style="font-size:18px;color:var(--primary);">person</span>
+              <div><div style="font-weight:600;font-size:13px;">${c.name}</div><div style="font-size:11px;color:var(--text-muted);">${c.code} · ${c.phone}</div></div>
+            </div>`).join('');
+        }
+        if (invMatches.length > 0) {
+          html += `<div style="padding:8px 12px;font-size:11px;font-weight:700;color:var(--text-muted);text-transform:uppercase;border-bottom:1px solid var(--border-color);">Invoices</div>`;
+          html += invMatches.map(i => `
+            <div class="search-result-item" onclick="App.navigate('invoiceHistory'); document.getElementById('histSearchInput').value='${i.number}'; renderInvoiceHistory(); document.getElementById('headerSearchPanel').style.display='none'; document.getElementById('headerSearch').value='';" style="padding:10px 12px;cursor:pointer;display:flex;align-items:center;gap:8px;border-bottom:1px solid var(--border-color);" onmouseover="this.style.background='var(--bg)'" onmouseout="this.style.background='';">
+              <span class="material-icons-outlined" style="font-size:18px;color:var(--success);">receipt</span>
+              <div><div style="font-weight:600;font-size:13px;">${i.number}</div><div style="font-size:11px;color:var(--text-muted);">${i.custName} · ${PH_DATA.formatCurrency(i.grandTotal)}</div></div>
+            </div>`).join('');
+        }
+        if (!html) {
+          html = `<div style="padding:20px;text-align:center;color:var(--text-muted);">No results for "${hs.value}"</div>`;
+        }
+        searchPanel.innerHTML = html;
+        searchPanel.style.display = 'block';
+      });
+
+      hs.addEventListener('keydown', e => {
+        if (e.key === 'Escape') { searchPanel.style.display = 'none'; hs.value = ''; }
+      });
+
+      document.addEventListener('click', e => {
+        if (!hs.parentElement.contains(e.target)) searchPanel.style.display = 'none';
+      });
+    }
 
     // Print preview close
     const ppClose = document.getElementById('closePrintPreview');
@@ -638,11 +673,13 @@ function renderInvoiceHistory(filter = 'all') {
   if (filter === 'partial')   invoices = invoices.filter(i => i.paymentStatus === 'Partial');
   if (filter === 'cancelled') invoices = invoices.filter(i => i.status === 'cancelled');
 
-  // Date filters
-  const fromDate = document.getElementById('histFilterFromDate')?.value;
-  const toDate = document.getElementById('histFilterToDate')?.value;
+  // Date filters — match IDs from HTML (histFromDate / histToDate)
+  const fromDate = document.getElementById('histFromDate')?.value ||
+                   document.getElementById('histFilterFromDate')?.value;
+  const toDate   = document.getElementById('histToDate')?.value ||
+                   document.getElementById('histFilterToDate')?.value;
   if (fromDate) invoices = invoices.filter(i => i.date >= fromDate);
-  if (toDate) invoices = invoices.filter(i => i.date <= toDate);
+  if (toDate)   invoices = invoices.filter(i => i.date <= toDate);
 
   // Type & Exec filters
   const invType = document.getElementById('histFilterType')?.value;
@@ -662,9 +699,18 @@ function renderInvoiceHistory(filter = 'all') {
     }
   }
 
+  // ── Pagination ──
+  const ROWS_PER_PAGE = 25;
+  const totalPages = Math.max(1, Math.ceil(invoices.length / ROWS_PER_PAGE));
+  // Read current page from a data attribute on tbody or default to 1
+  const currentPage = parseInt(tbody.dataset.page || '1');
+  const safePage = Math.min(Math.max(1, currentPage), totalPages);
+  tbody.dataset.page = safePage;
+  const pageInvoices = invoices.slice((safePage - 1) * ROWS_PER_PAGE, safePage * ROWS_PER_PAGE);
+
   const payMap = { Paid:'badge-success', Pending:'badge-warning', Partial:'badge-warning', Cancelled:'badge-danger' };
 
-  tbody.innerHTML = invoices.map(inv => `
+  tbody.innerHTML = pageInvoices.map(inv => `
     <tr>
       <td class="tbl-check"><input type="checkbox" class="row-checkbox"></td>
       <td class="mono"><strong>${inv.number}</strong></td>
@@ -690,7 +736,26 @@ function renderInvoiceHistory(filter = 'all') {
       </td>
     </tr>`).join('');
 
-}
+  // Render pagination bar
+  const paginationEl = document.getElementById('historyPagination');
+  if (paginationEl) {
+    if (totalPages <= 1) { paginationEl.innerHTML = ''; return; }
+    let pHtml = `<div style="display:flex;align-items:center;gap:6px;padding:12px 0;justify-content:center;">`;
+    pHtml += `<button class="btn btn-outline btn-sm" ${safePage === 1 ? 'disabled' : ''} onclick="window._histPage(${safePage - 1})">← Prev</button>`;
+    for (let p = 1; p <= totalPages; p++) {
+      pHtml += `<button class="btn btn-sm ${p === safePage ? 'btn-primary' : 'btn-outline'}" onclick="window._histPage(${p})">${p}</button>`;
+    }
+    pHtml += `<button class="btn btn-outline btn-sm" ${safePage === totalPages ? 'disabled' : ''} onclick="window._histPage(${safePage + 1})">Next →</button>`;
+    pHtml += `<span style="color:var(--text-muted);font-size:12px;margin-left:8px;">${invoices.length} records</span>`;
+    pHtml += `</div>`;
+    paginationEl.innerHTML = pHtml;
+  }
+
+  // Expose page setter
+  window._histPage = function(p) {
+    tbody.dataset.page = p;
+    renderInvoiceHistory(filter);
+  };
 
 window.viewInvoice = function(invId) {
     const inv = PH_DATA.invoices.find(i => i.id === invId || i.number === invId);
@@ -1010,12 +1075,25 @@ function renderCancelled() {
       <td><span class="badge badge-danger">Cancelled</span></td>
       <td>
         <div class="d-flex gap-2">
-          <button class="btn btn-outline btn-sm" onclick="AppToast.show('Viewing cancelled invoice','info')">View</button>
-          <button class="btn btn-outline btn-sm" onclick="AppToast.show('Duplicating as new invoice','info')">Duplicate</button>
+          <button class="btn btn-outline btn-sm" onclick="viewInvoice('${inv.id || inv.number}')">View</button>
+          <button class="btn btn-outline btn-sm" onclick="duplicateCancelledInvoice('${inv.id || inv.number}')">
+            <span class="material-icons-outlined" style="font-size:14px;vertical-align:middle;">content_copy</span> Duplicate
+          </button>
         </div>
       </td>
     </tr>`).join('') : '<tr><td colspan="6" class="text-center text-muted" style="padding:40px">No cancelled invoices</td></tr>';
 }
+
+window.duplicateCancelledInvoice = function(invId) {
+  const inv = PH_DATA.invoices.find(i => i.id === invId || i.number === invId);
+  if (!inv) return;
+  App.navigate('newInvoice');
+  AppToast.show('Invoice duplicated — select products and save as new invoice', 'info');
+  // If InvoiceModule supports it, pre-fill customer
+  if (typeof InvoiceModule !== 'undefined' && typeof InvoiceModule.selectCustomerById === 'function' && inv.customerId) {
+    setTimeout(() => InvoiceModule.selectCustomerById(inv.customerId), 300);
+  }
+};
 
 // ── Print Queue ───────────────────────────────
 function renderPrintQueue() {
@@ -1939,6 +2017,161 @@ document.addEventListener('DOMContentLoaded', () => {
     calculatePharmaPrice();
 });
 
+
+// ── Export Functions ─────────────────────────
+window.exportInvoicesCSV = function() {
+  const invoices = PH_DATA.invoices.filter(i => i.status !== 'cancelled');
+  if (invoices.length === 0) { AppToast.show('No invoices to export', 'warning'); return; }
+
+  const headers = ['Invoice No','Date','Time','Customer','Type','Payment Mode','Items','Taxable','CGST','SGST','IGST','Grand Total','Status'];
+  const rows = invoices.map(inv => [
+    inv.number, inv.date, inv.time || '', `"${inv.custName}"`,
+    inv.type || 'Tax Invoice', inv.paymentMode, inv.items,
+    inv.taxable.toFixed(2),
+    inv.cgst.toFixed(2), inv.sgst.toFixed(2), inv.igst.toFixed(2),
+    inv.grandTotal.toFixed(2), inv.paymentStatus
+  ]);
+
+  const csvContent = [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
+  const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  const today = new Date().toISOString().split('T')[0];
+  a.download = `PADOWA_Invoices_${today}.csv`;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+  AppToast.show(`✓ Exported ${invoices.length} invoices as CSV`, 'success');
+};
+
+window.exportCustomersCSV = function() {
+  const customers = PH_DATA.customers;
+  if (customers.length === 0) { AppToast.show('No customers to export', 'warning'); return; }
+
+  const headers = ['Code','Name','GSTIN','Drug License','Contact','Phone','Email','City','State','Outstanding','Credit Limit'];
+  const rows = customers.map(c => [
+    c.code, `"${c.name}"`, c.gstin || '', c.drugLicense || '',
+    `"${c.contact || ''}"`, c.phone, c.email || '',
+    c.city, c.state, (c.outstanding || 0).toFixed(2), (c.creditLimit || 0).toFixed(2)
+  ]);
+
+  const csvContent = [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
+  const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  const today = new Date().toISOString().split('T')[0];
+  a.download = `PADOWA_Customers_${today}.csv`;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+  AppToast.show(`✓ Exported ${customers.length} customers as CSV`, 'success');
+};
+
+window.exportProductsCSV = function() {
+  const products = PH_DATA.products;
+  if (products.length === 0) { AppToast.show('No products to export', 'warning'); return; }
+
+  const headers = ['Code','Name','Composition','Pack','HSN','GST%','MRP','PTR','PTS/Rate','Stock'];
+  const rows = products.map(p => [
+    p.code, `"${p.name}"`, `"${p.composition || ''}"`,
+    p.pack, p.hsn || '', p.gst,
+    (p.mrp || 0).toFixed(2), (p.ptr || 0).toFixed(2),
+    (p.rate || p.pts || 0).toFixed(2), p.stock || 0
+  ]);
+
+  const csvContent = [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
+  const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  const today = new Date().toISOString().split('T')[0];
+  a.download = `PADOWA_Products_${today}.csv`;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+  AppToast.show(`✓ Exported ${products.length} products as CSV`, 'success');
+};
+
+// ── Notifications Panel ──────────────────────
+window.toggleNotificationsPanel = function() {
+  let panel = document.getElementById('notificationsPanel');
+  if (!panel) {
+    panel = document.createElement('div');
+    panel.id = 'notificationsPanel';
+    panel.style.cssText = 'position:fixed;top:60px;right:16px;width:340px;max-height:480px;overflow-y:auto;background:var(--card);border:1px solid var(--border-color);border-radius:var(--radius-md);box-shadow:0 12px 32px rgba(0,0,0,0.15);z-index:8000;display:none;';
+    document.body.appendChild(panel);
+    document.addEventListener('click', function handler(e) {
+      const bell = document.getElementById('notificationsBell');
+      if (panel.style.display !== 'none' && !panel.contains(e.target) && !(bell && bell.contains(e.target))) {
+        panel.style.display = 'none';
+      }
+    });
+  }
+
+  if (panel.style.display !== 'none') { panel.style.display = 'none'; return; }
+
+  // Build notifications from live data
+  const overdueCustomers = PH_DATA.customers.filter(c => (c.outstanding || 0) > 0).slice(0, 5);
+  const pendingInvoices  = PH_DATA.invoices.filter(i => i.paymentStatus === 'Pending' && i.status !== 'cancelled').slice(0, 5);
+  const recentCancelled  = PH_DATA.invoices.filter(i => i.status === 'cancelled').slice(0, 3);
+
+  let html = `<div style="padding:12px 16px;border-bottom:1px solid var(--border-color);font-weight:700;font-size:14px;display:flex;justify-content:space-between;align-items:center;">
+    <span><span class="material-icons-outlined" style="vertical-align:middle;font-size:18px;margin-right:4px;">notifications</span> Notifications</span>
+    <button onclick="document.getElementById('notificationsPanel').style.display='none'" style="background:none;border:none;cursor:pointer;"><span class="material-icons-outlined" style="font-size:18px;">close</span></button>
+  </div>`;
+
+  if (overdueCustomers.length > 0) {
+    html += `<div style="padding:8px 16px;font-size:11px;font-weight:700;color:var(--danger);text-transform:uppercase;">Outstanding Balances</div>`;
+    html += overdueCustomers.map(c => `
+      <div onclick="App.navigate('customers')" style="padding:10px 16px;cursor:pointer;border-bottom:1px solid var(--border-color);display:flex;gap:10px;align-items:center;" onmouseover="this.style.background='var(--bg)'" onmouseout="this.style.background='';">
+        <span class="material-icons-outlined" style="color:var(--danger);font-size:20px;">warning</span>
+        <div><div style="font-weight:600;font-size:13px;">${c.name}</div><div style="font-size:11px;color:var(--text-muted);">Balance due: ${PH_DATA.formatCurrency(c.outstanding)}</div></div>
+      </div>`).join('');
+  }
+
+  if (pendingInvoices.length > 0) {
+    html += `<div style="padding:8px 16px;font-size:11px;font-weight:700;color:var(--warning);text-transform:uppercase;">Pending Payments</div>`;
+    html += pendingInvoices.map(i => `
+      <div onclick="App.navigate('invoiceHistory')" style="padding:10px 16px;cursor:pointer;border-bottom:1px solid var(--border-color);display:flex;gap:10px;align-items:center;" onmouseover="this.style.background='var(--bg)'" onmouseout="this.style.background='';">
+        <span class="material-icons-outlined" style="color:var(--warning);font-size:20px;">pending</span>
+        <div><div style="font-weight:600;font-size:13px;">${i.number} — ${i.custName}</div><div style="font-size:11px;color:var(--text-muted);">${PH_DATA.formatCurrency(i.grandTotal)} · ${i.date}</div></div>
+      </div>`).join('');
+  }
+
+  if (recentCancelled.length > 0) {
+    html += `<div style="padding:8px 16px;font-size:11px;font-weight:700;color:var(--text-muted);text-transform:uppercase;">Recently Cancelled</div>`;
+    html += recentCancelled.map(i => `
+      <div onclick="App.navigate('cancelled')" style="padding:10px 16px;cursor:pointer;border-bottom:1px solid var(--border-color);display:flex;gap:10px;align-items:center;" onmouseover="this.style.background='var(--bg)'" onmouseout="this.style.background='';">
+        <span class="material-icons-outlined" style="color:var(--text-muted);font-size:20px;">cancel</span>
+        <div><div style="font-weight:600;font-size:13px;">${i.number}</div><div style="font-size:11px;color:var(--text-muted);">${i.custName} · ${i.date}</div></div>
+      </div>`).join('');
+  }
+
+  if (!overdueCustomers.length && !pendingInvoices.length && !recentCancelled.length) {
+    html += `<div style="padding:32px;text-align:center;color:var(--text-muted);"><span class="material-icons-outlined" style="font-size:40px;display:block;margin-bottom:8px;">done_all</span>All clear! No pending items.</div>`;
+  }
+
+  panel.innerHTML = html;
+  panel.style.display = 'block';
+};
+
+// ── Date Filter ID aliases ───────────────────
+// Support both old (histFilterFromDate) and new (histFromDate) IDs
+document.addEventListener('DOMContentLoaded', () => {
+  ['histFromDate', 'histToDate'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.addEventListener('change', () => {
+      const activeTabBtn = document.querySelector('[data-hist-tab].is-active');
+      const currentFilter = activeTabBtn ? activeTabBtn.dataset.histTab : 'all';
+      renderInvoiceHistory(currentFilter);
+    });
+  });
+});
 
 // --- Vite Global Expose ---
 if (typeof window !== "undefined") {

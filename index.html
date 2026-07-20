@@ -9,18 +9,31 @@
 
   <!-- Fonts & Icons -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
-  <script>
-    window.addEventListener('error', function(e) {
-      alert("JS ERROR: " + e.message + " at " + e.filename + ":" + e.lineno);
-    });
-  </script>
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
   <link href="https://fonts.googleapis.com/icon?family=Material+Icons+Outlined" rel="stylesheet">
 
   <!-- Stylesheets -->
-  
-  <link rel="stylesheet" href="/src/print/invoice-print.css" media="print">
+  <link rel="stylesheet" href="src/print/invoice-print.css" media="print">
+
+  <!-- Consolidated inline styles (moved from body) -->
+  <style>
+    @keyframes slideUpFade {
+      from { opacity: 0; transform: translateY(20px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    #profileDropdown.is-open { display: flex !important; }
+    .dropdown-item:hover { background: var(--bg) !important; }
+    .product-grid-wrap::-webkit-scrollbar { height: 10px !important; width: 10px !important; }
+    .product-grid-wrap::-webkit-scrollbar-track { background: #e2e8f0 !important; border-radius: 8px; }
+    .product-grid-wrap::-webkit-scrollbar-thumb { background: #94a3b8 !important; border-radius: 8px !important; border: 2px solid #e2e8f0 !important; }
+    .product-grid-wrap::-webkit-scrollbar-thumb:hover { background: #64748b !important; }
+    .product-grid-wrap::-webkit-scrollbar-corner { background: #e2e8f0; }
+    .product-grid-wrap thead tr th { position: sticky !important; top: 0 !important; z-index: 10 !important; background: #ffffff !important; color: #334155 !important; border-bottom: 2px solid #e2e8f0 !important; }
+  </style>
+
+  <!-- External Libraries -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
 </head>
 <body>
   <!-- ═══════════════════════════════════════════
@@ -46,12 +59,7 @@
         <button type="submit" class="btn btn-primary" style="width:100%; padding:14px; font-size:16px; font-weight:600; border-radius:var(--radius-md); box-shadow:0 8px 16px rgba(0,87,217,0.25); transition:all 0.2s;">Secure Sign In</button>
       </form>
     </div>
-    <style>
-      @keyframes slideUpFade {
-        from { opacity: 0; transform: translateY(20px); }
-        to { opacity: 1; transform: translateY(0); }
-      }
-    </style>
+  
   </div>
 
 <!-- ══════════════════════════════════════════════════
@@ -89,7 +97,7 @@
     <button class="btn btn-outline btn-sm" id="openCalculator" onclick="document.getElementById('calculatorModal').classList.add('is-open')" style="margin-right: 12px; display: flex; align-items: center; gap: 4px; border-color: var(--border-1); color: var(--text-dark);">
       <span class="material-icons-outlined" style="font-size: 16px;">calculate</span> PTS/PTR Calculator
     </button>
-    <button class="header-icon-btn" title="Notifications (3 unread)" onclick="AppToast.show('3 pending invoice approvals','warning')">
+    <button class="header-icon-btn" id="notificationsBell" title="Notifications" onclick="window.toggleNotificationsPanel && window.toggleNotificationsPanel()">
       <span class="material-icons-outlined">notifications</span>
       <div class="notif-badge"></div>
     </button>
@@ -104,7 +112,7 @@
     </button>
     <div class="header-divider"></div>
     <div class="header-profile" title="Administrator" onclick="document.getElementById('profileDropdown').classList.toggle('is-open')" style="position:relative; cursor:pointer;">
-      <div class="profile-avatar" id="headerProfileAvatar">RK</div>
+      <div class="profile-avatar" id="headerProfileAvatar">PK</div>
       <span class="profile-name" id="headerProfileName">Dr. PRASANTH KINJINGI</span>
       <span class="material-icons-outlined" style="font-size:16px; color:var(--text-muted)">expand_more</span>
       
@@ -122,10 +130,7 @@
         </button>
       </div>
     </div>
-    <style>
-      #profileDropdown.is-open { display: flex !important; }
-      .dropdown-item:hover { background: var(--bg) !important; }
-    </style>
+
   </div>
 
 </header>
@@ -689,14 +694,7 @@
             <div class="inv-section__body no-pad">
 
               <!-- Scrollable Grid -->
-              <style>
-                .product-grid-wrap::-webkit-scrollbar { height: 10px !important; width: 10px !important; }
-                .product-grid-wrap::-webkit-scrollbar-track { background: #e2e8f0 !important; border-radius: 8px; }
-                .product-grid-wrap::-webkit-scrollbar-thumb { background: #94a3b8 !important; border-radius: 8px !important; border: 2px solid #e2e8f0 !important; }
-                .product-grid-wrap::-webkit-scrollbar-thumb:hover { background: #64748b !important; }
-                .product-grid-wrap::-webkit-scrollbar-corner { background: #e2e8f0; }
-                .product-grid-wrap thead tr th { position: sticky !important; top: 0 !important; z-index: 10 !important; background: #ffffff !important; color: #334155 !important; border-bottom: 2px solid #e2e8f0 !important; }
-              </style>
+
               <div class="product-grid-wrap" style="height: 420px; overflow-y: auto; overflow-x: auto; border: 1px solid #e2e8f0; border-radius: 0 0 8px 8px;">
                 <table class="product-table" id="productTable">
                   <thead>
@@ -893,7 +891,7 @@
                 <div>
                   <div class="form-group mb-4">
                     <label class="form-label">Terms & Conditions</label>
-                    <textarea class="form-control" rows="4" id="invTerms">Subject to Bengaluru jurisdiction. Goods once sold will not be taken back or exchanged without valid reason. All disputes subject to arbitration per Company Policy. E.&amp;O.E.</textarea>
+                    <textarea class="form-control" rows="4" id="invTerms">Subject to Bengaluru jurisdiction. Goods once sold will not be taken back or exchanged without valid reason. All disputes subject to arbitration per Company Policy. E.&O.E.</textarea>
                   </div>
                   <div class="form-group">
                     <label class="form-label">Bank Details (for printout)</label>
@@ -1004,11 +1002,11 @@
 
               <!-- Save Button -->
               <div class="mt-4">
-                <button class="btn btn-primary w-100" style="justify-content:center; font-size:14px; padding:12px;" onclick="document.getElementById('toolSaveInvoice').click()">
+                <button class="btn btn-primary w-100" id="toolSaveInvoice" style="justify-content:center; font-size:14px; padding:12px;">
                   <span class="material-icons-outlined">check_circle</span>
                   Save Invoice
                 </button>
-                <button class="btn btn-outline w-100 mt-3" style="justify-content:center;" onclick="document.getElementById('toolSaveDraft').click()">
+                <button class="btn btn-outline w-100 mt-3" id="toolSaveDraft" style="justify-content:center;">
                   <span class="material-icons-outlined">save_as</span>
                   Save as Draft
                 </button>
@@ -1062,7 +1060,7 @@
             <p class="page-subtitle" id="customersCount">Loading customers...</p>
           </div>
           <div class="d-flex gap-3">
-            <button class="btn btn-outline" onclick="AppToast.show('Exporting Customers CSV...','info')">
+            <button class="btn btn-outline" onclick="window.exportCustomersCSV && window.exportCustomersCSV()">
               <span class="material-icons-outlined">download</span> Export
             </button>
             <button class="btn btn-primary" onclick="openCustomerAddModal()">
@@ -1113,7 +1111,7 @@
             <p class="page-subtitle" id="productsCount">Loading products...</p>
           </div>
           <div class="d-flex gap-3">
-            <button class="btn btn-outline" onclick="AppToast.show('Exporting Products CSV...','info')">
+            <button class="btn btn-outline" onclick="window.exportProductsCSV && window.exportProductsCSV()">
               <span class="material-icons-outlined">download</span> Export
             </button>
             <button class="btn btn-primary" onclick="openProductAddModal()">
@@ -1163,8 +1161,8 @@
             <p class="page-subtitle">All invoices · FY 2026-27</p>
           </div>
           <div class="d-flex gap-3">
-            <button class="btn btn-outline" onclick="AppToast.show('Exporting to Excel...','success')">
-              <span class="material-icons-outlined">table_chart</span> Export
+            <button class="btn btn-outline" onclick="window.exportInvoicesCSV && window.exportInvoicesCSV()">
+              <span class="material-icons-outlined">download</span> Export CSV
             </button>
             <button class="btn btn-primary" onclick="App.navigate('newInvoice')">
               <span class="material-icons-outlined">add</span> New Invoice
@@ -1176,11 +1174,11 @@
         <div class="filter-bar">
           <div class="filter-group">
             <span class="filter-label">From Date</span>
-            <input type="date" class="form-control filter-control">
+            <input type="date" class="form-control filter-control" id="histFromDate">
           </div>
           <div class="filter-group">
             <span class="filter-label">To Date</span>
-            <input type="date" class="form-control filter-control">
+            <input type="date" class="form-control filter-control" id="histToDate">
           </div>
           <div class="filter-group">
             <span class="filter-label">Invoice Type</span>
@@ -1251,23 +1249,8 @@
               <tbody id="historyTbody"></tbody>
             </table>
           </div>
-          <!-- Pagination -->
-          <div class="pagination">
-            <span></span>
-            <div class="pagination-pages">
-              <button class="page-btn"><span class="material-icons-outlined">chevron_left</span></button>
-              <button class="page-btn is-active">1</button>
-              <button class="page-btn">2</button>
-              <button class="page-btn">3</button>
-              <button class="page-btn"><span class="material-icons-outlined">chevron_right</span></button>
-            </div>
-            <div class="d-flex align-center gap-3">
-              <span>Per page:</span>
-              <select class="form-control" style="width:70px; height:30px; font-size:12px;">
-                <option>25</option><option>50</option><option>100</option>
-              </select>
-            </div>
-          </div>
+          <!-- Dynamic Pagination (rendered by JS) -->
+          <div id="historyPagination"></div>
         </div>
 
       </div>
@@ -1341,7 +1324,7 @@
             <h1 class="page-title page-title-gradient">Print Queue</h1>
             <p class="page-subtitle">Select invoices and print in batch</p>
           </div>
-          <button class="btn btn-primary" onclick="AppToast.show('Printing selected invoices...','info')">
+          <button class="btn btn-primary" onclick="window.printSelectedQueue && window.printSelectedQueue()">
             <span class="material-icons-outlined">print</span> Print Selected
           </button>
         </div>
@@ -1375,7 +1358,7 @@
             <p class="page-subtitle">Analytics and GST reports for PADOWA Healthcare · FY 2026-27</p>
           </div>
           <div class="d-flex gap-3">
-            <button class="btn btn-outline" onclick="AppToast.show('Exporting report...','success')">
+            <button class="btn btn-outline" onclick="window.exportInvoicesCSV && window.exportInvoicesCSV()">
               <span class="material-icons-outlined">download</span> Export
             </button>
             <button class="btn btn-outline" onclick="window.print()">
@@ -1720,11 +1703,11 @@
             <div class="card-body">
               <div class="form-group mb-3">
                 <label class="form-label">Autosave Interval</label>
-                <select class="form-control"><option>Every 30 seconds</option><option>Every 1 minute</option><option>Every 5 minutes</option><option>Disabled</option></select>
+                <select class="form-control" id="settingAutosaveInterval"><option>Every 30 seconds</option><option>Every 1 minute</option><option>Every 5 minutes</option><option>Disabled</option></select>
               </div>
               <div class="form-group mb-3">
                 <label class="form-label">Rows per page (Invoice History)</label>
-                <select class="form-control"><option>25</option><option>50</option><option>100</option></select>
+                <select class="form-control" id="settingRowsPerPage"><option>25</option><option>50</option><option>100</option></select>
               </div>
               <div class="form-group">
                 <label class="form-label">Keyboard Navigation</label>
@@ -1742,7 +1725,7 @@
     <!-- ═══ END SETTINGS ═══ -->
   </div><!-- /main-content -->
 
-  <!-- /app-main -->
+</main><!-- /app-main -->
 
 
 <!-- ══════════════════════════════════════════════════
@@ -2185,7 +2168,7 @@
         <span class="material-icons-outlined" style="vertical-align:middle;margin-right:8px;">preview</span>
         Invoice Print Preview
       </span>
-      <button class="modal__close" id="closePrintPreview">
+      <button class="modal__close" id="closePrintPreview" onclick="document.getElementById('printPreviewModal').classList.remove('is-open')">
         <span class="material-icons-outlined">close</span>
       </button>
     </div>
@@ -2309,11 +2292,10 @@
 <!-- ══════════════════════════════════════════════════
      SCRIPTS
 ══════════════════════════════════════════════════ -->
-<script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
-  <!-- =========================================
-       ADD PRODUCT MODAL
-  ========================================== -->
-  <div class="modal-overlay" id="productAddModal">
+<!-- =========================================
+     ADD PRODUCT MODAL
+========================================== -->
+<div class="modal-overlay" id="productAddModal">
     <div class="modal-content modal" style="max-width:850px; border-radius:12px; overflow:hidden; border:1px solid rgba(255,255,255,0.1);">
       <div class="modal__header">
         <h2 class="modal__title" id="productAddModalTitle"><span class="material-icons-outlined" style="color:var(--primary); font-size:24px; vertical-align: middle;">medication</span> Add New Product</h2>
@@ -2433,11 +2415,10 @@
     </div>
   </div>
 
-  
-
-
-
-
+<!-- ══════════════════════════════════════════════════
+     SCRIPTS
+══════════════════════════════════════════════════ -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
 <script>
   // Sync autosave invoice number display
   document.addEventListener('DOMContentLoaded', () => {
@@ -2480,6 +2461,6 @@
   });
 </script>
 
-  <script type="module" src="/src/main.js"></script>
+  <script type="module" src="src/main.js"></script>
 </body>
 </html>

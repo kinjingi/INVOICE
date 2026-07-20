@@ -1114,7 +1114,21 @@ const InvoiceModule = (() => {
   }
 
   function emailInvoice() {
-    AppToast.show('Email feature: connect to mail service API', 'info');
+    const errors = validate();
+    if (errors.length > 0) { AppToast.show('Please complete the invoice before emailing', 'warning'); return; }
+    const c = state.customer || {};
+    const t = calcTotals();
+    const to = c.email || '';
+    const subject = encodeURIComponent(`Invoice ${state.invoiceNumber} from PADOWA Healthcare`);
+    const body = encodeURIComponent(
+      `Dear ${c.name || 'Customer'},\n\n` +
+      `Please find details for Invoice ${state.invoiceNumber} dated ${state.invoiceDate}.\n\n` +
+      `Amount: ₹${PH_DATA.formatNum(t.grandTotal)}\n` +
+      `Payment Mode: ${state.paymentMode}\n\n` +
+      `Thank you for your business.\n\nWarm regards,\nPADOWA Healthcare`
+    );
+    window.open(`mailto:${to}?subject=${subject}&body=${body}`);
+    AppToast.show('Mail client opened with invoice details', 'info');
   }
 
   async function whatsappInvoice() {
